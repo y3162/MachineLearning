@@ -4,11 +4,12 @@
 namespace CG
 {
     template<typename T> using vec1 = std::vector<T>;
+    template<typename T> using vec2 = vec1<vec1<T>>;
     using dtype = double;
 
     class Node
     {
-        public:
+        public :
             vec1<dtype> data;
             vec1<dtype> grad;
             vec1<Node*> forward;
@@ -18,8 +19,9 @@ namespace CG
 
             Node (){}
 
-            virtual void ForwardPropagation(){}
-            void BackPropagation(dtype eta)
+            virtual void forwardPropagation(){}
+            virtual void calcPartialDerivative(){}
+            void backPropagation(dtype eta)
             {
                 if (++f_count < forward.size()) {
                     return;
@@ -30,25 +32,18 @@ namespace CG
                 if (forward.size() == 0) {
                     assert (data.size() == 1);
                     grad.at(0) = 1;
-                } else {
-                    for (int i=0; i<grad.size(); ++i) {
-                        dtype sum = 0;
-                        for (int j=0; j<forward.size(); ++j) { // Chain Rule for Partial Derivatives
-                            sum += forward.at(j)->grad.at(i);
-                        }
-                        grad.at(i) = grad.at(i) * sum;
-                    }
                 }
+                calcPartialDerivative();
 
                 for (int i=0; i<back.size(); ++i) {
-                    back.at(i)->BackPropagation(eta);
+                    back.at(i)->backPropagation(eta);
                 }
             }
     };
 
     class Leaf : public Node
     {
-        public:
+        public :
             Leaf (size_t size)
             {
                 data.resize(size);
@@ -63,18 +58,18 @@ namespace CG
                 data = input;
             }
 
-            virtual void ForwardPropagation()
+            virtual void forwardPropagation()
             {
                 for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->ForwardPropagation();
+                    forward.at(i)->forwardPropagation();
                 }
             }
     };
 
-    class Plus : public Node
+    class Add : public Node
     {   
-        public:
-            Plus (Node *node1, Node *node2)
+        public :
+            Add (Node *node1, Node *node2)
             {   
                 assert (node1->data.size() == node2->data.size());
 
@@ -88,15 +83,15 @@ namespace CG
                 back.at(0) = node1;
                 back.at(1) = node2;
 
-                int fsize1 = node1->forward.size();
+                size_t fsize1 = node1->forward.size();
                 node1->forward.resize(fsize1+1);
                 node1->forward.at(fsize1) = this;
-                int fsize2 = node2->forward.size();
+                size_t fsize2 = node2->forward.size();
                 node2->forward.resize(fsize2+1);
                 node2->forward.at(fsize2) = this;
             };
 
-            virtual void ForwardPropagation()
+            virtual void forwardPropagation()
             {   
                 if (++b_count < back.size()) {
                     return;
@@ -107,23 +102,181 @@ namespace CG
                 for (int i=0; i<data.size(); ++i) {
                     data.at(i) = back.at(0)->data.at(i) + back.at(1)->data.at(i);
                 }
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->ForwardPropagation();
-                }
 
-                for (int i=0; i<back.at(0)->grad.size(); ++i) {
-                    back.at(0)->grad.at(i) = 1;
-                    back.at(1)->grad.at(i) = 1;
+                for (int i=0; i<forward.size(); ++i) {
+                    forward.at(i)->forwardPropagation();
+                }
+            }
+
+
+            void calcPartialDerivative()
+            {   
+                for (int i=0; i<grad.size(); ++i) {
+                    back.at(0)->grad.at(i) = 1 * grad.at(i);
+                    back.at(1)->grad.at(i) = 1 * grad.at(i);
                 }
             }
     };
 
-    class Dots : public Plus
+    class Sub : public Add
     {
-        public:
-            Dots (Node *node1, Node *node2) : Plus (node1, node2){};
+        public :
+            Sub (Node *node1, Node *node2) : Add (node1, node2){};
 
-            virtual void ForwardPropagation()
+            virtual void forwardPropagation()
+            {   
+                if (++b_count < back.size()) {
+                    return;
+                } else { // When all the forward passes from the units in the preceding layer have been completed
+                    b_count = 0;
+                }
+
+                for (int i=0; i<data.size(); ++i) {
+                    data.at(i) = back.at(0)->data.at(i) - back.at(1)->data.at(i);
+                }
+
+                for (int i=0; i<forward.size(); ++i) {
+                    forward.at(i)->forwardPropagation();
+                }
+
+                for (int i=0; i<back.at(0)->grad.size(); ++i) {
+                    back.at(0)->grad.at(i) = 1;
+                    back.at(1)->grad.at(i) = -1;
+                }
+            }
+
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<data.size(); ++i) {
+                    back.at(0)->grad.at(i) =  1 * grad.at(i);
+                    back.at(1)->grad.at(i) = -1 * grad.at(i);
+                }
+            }
+    };
+
+    class Dots : public Node
+    {
+        public :
+            Dots (Node *node1, Node *node2)
+            {   
+                assert (node1->data.size() == node2->data.size());
+
+                data.resize(1);
+                grad.resize(1);
+
+                forward.resize(0);
+
+                back.resize(2);
+                back.at(0) = node1;
+                back.at(1) = node2;
+
+                size_t fsize1 = node1->forward.size();
+                node1->forward.resize(fsize1+1);
+                node1->forward.at(fsize1) = this;
+                size_t fsize2 = node2->forward.size();
+                node2->forward.resize(fsize2+1);
+                node2->forward.at(fsize2) = this;
+            };
+
+            virtual void forwardPropagation()
+            {   
+                if (++b_count < back.size()) {
+                    return;
+                } else { // When all the forward passes from the units in the preceding layer have been completed
+                    b_count = 0;
+                }
+
+                data.at(0) = 0;
+                for (int i=0; i<data.size(); ++i) {
+                    data.at(0) += back.at(0)->data.at(i) * back.at(1)->data.at(i);
+                }
+                
+                for (int i=0; i<forward.size(); ++i) {
+                    forward.at(i)->forwardPropagation();
+                }
+            }
+
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<data.size(); ++i) {
+                    back.at(0)->grad.at(i) = back.at(1)->data.at(i) * grad.at(0);
+                    back.at(1)->grad.at(i) = back.at(0)->data.at(i) * grad.at(0);
+                }
+            }
+    };
+
+    class Norm2 : public Node
+    {
+        public :
+            Norm2 (Node *node1)
+            {   
+                data.resize(1);
+                grad.resize(1);
+
+                forward.resize(0);
+
+                back.resize(1);
+                back.at(0) = node1;
+
+                size_t fsize1 = node1->forward.size();
+                node1->forward.resize(fsize1+1);
+                node1->forward.at(fsize1) = this;
+            };
+
+            virtual void forwardPropagation()
+            {
+                if (++b_count < back.size()) {
+                    return;
+                } else { // When all the forward passes from the units in the preceding layer have been completed
+                    b_count = 0;
+                }
+
+                data.at(0) = 0;
+                for (int i=0; i<back.at(0)->data.size(); ++i) {
+                    data.at(0) += back.at(0)->data.at(i) * back.at(0)->data.at(i);
+                }
+                data.at(0) = sqrt(data.at(0));
+
+                for (int i=0; i<forward.size(); ++i) {
+                    forward.at(i)->forwardPropagation();
+                }
+            }
+            
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<back.at(0)->grad.size(); ++i) {
+                    back.at(0)->grad.at(i) = back.at(0)->data.at(i) / data.at(0) * grad.at(0);
+                }
+            }
+    };
+
+    class Affine : public Node
+    {
+        public :
+            vec2<dtype> Weight;
+            dtype       bias = 1;
+
+            Affine (Node *node1, vec2<dtype> W)
+            {
+                assert (node1->data.size() + 1 == W.size());
+                
+                Weight = W;
+
+                size_t osize = W.at(0).size();
+                data.resize(osize);
+                grad.resize(osize);
+
+                forward.resize(0);
+
+                back.resize(1);
+                back.at(0) = node1;
+
+                size_t fsize1 = node1->forward.size();
+                node1->forward.resize(fsize1+1);
+                node1->forward.at(fsize1) = this;
+            }
+
+            virtual void forwardPropagation()
             {
                 if (++b_count < back.size()) {
                     return;
@@ -132,16 +285,39 @@ namespace CG
                 }
 
                 for (int i=0; i<data.size(); ++i) {
-                    data.at(i) = back.at(0)->data.at(i) * back.at(1)->data.at(i);
+                    data.at(i) = 0;
+                    for (int j=0; j<back.at(0)->data.size(); ++j) {
+                        data.at(i) += Weight.at(j).at(i) * back.at(0)->data.at(j);
+                    }
+                    data.at(i) += Weight.at(back.at(0)->data.size()).at(i) * bias;
                 }
                 for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->ForwardPropagation();
+                    forward.at(i)->forwardPropagation();
                 }
-                
+            }
+
+            virtual void calcPartialDerivative()
+            {
                 for (int i=0; i<back.at(0)->grad.size(); ++i) {
-                    back.at(0)->grad.at(i) = back.at(1)->data.at(i);
-                    back.at(1)->grad.at(i) = back.at(0)->data.at(i);
+                    back.at(0)->grad.at(i) = 0;
+                    for (int j=0; j<Weight.at(0).size(); ++j) {
+                        back.at(0)->grad.at(i) += Weight.at(i).at(j) * grad.at(j);
+                    }
                 }
             }
     };
+
+    void dumpNode (Node const node1, std::string name)
+    {
+        std::cout << name << " back size = " << node1.back.size()    << std::endl;
+        std::cout << name << " forw size = " << node1.forward.size() << std::endl;
+        std::cout << name << " data size = " << node1.data.size()    << std::endl;
+        std::cout << name << " data      = ";
+        for (int i=0; i<node1.data.size(); ++i) { std::cout << node1.data.at(i) << ((i==node1.data.size()-1) ? "": " "); }
+        std::cout << std::endl;
+        std::cout << name << " grad size = " << node1.grad.size()    << std::endl;
+        std::cout << name << " grad      = ";
+        for (int i=0; i<node1.grad.size(); ++i) { std::cout << node1.grad.at(i) << ((i==node1.grad.size()-1) ? "": " "); }
+        std::cout << std::endl;
+    }
 };
