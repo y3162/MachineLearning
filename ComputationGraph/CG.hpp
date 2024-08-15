@@ -21,7 +21,32 @@ namespace CG
 
             Node (){}
 
-            virtual void forwardPropagation(){}
+            void pushThis(Node *node) // push this as argument's forward node
+            {
+                size_t fsize = node->forward.size();
+                node->forward.resize(fsize+1);
+                node->forward.at(fsize) = this;
+            }
+
+            virtual void calcData(){}
+            void forwardPropagation()
+            {
+                if (++b_count < back.size()) {
+                    return;
+                } else { // When all the forward passes from the units in the preceding layer have been completed
+                    b_count = 0;
+                }
+
+                for (int i=0; i<grad.size(); ++i) {
+                    grad.at(i) = 0;
+                }
+
+                calcData();
+
+                for (int i=0; i<forward.size(); ++i) {
+                    forward.at(i)->forwardPropagation();
+                }
+            }
 
             virtual void calcPartialDerivative(){}
             void backPropagation()
@@ -52,10 +77,6 @@ namespace CG
                     f_count = 0;
                 }
 
-                if (forward.size() == 0) {
-                    assert (data.size() == 1);
-                    grad.at(0) = 1;
-                }
                 updateParameters(eta);
 
                 for (int i=0; i<back.size(); ++i) {
@@ -81,13 +102,6 @@ namespace CG
                 assert (data.size() == input.size());
                 data = input;
             }
-
-            virtual void forwardPropagation()
-            {
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
-                }
-            }
     };
 
     class Add : public Node
@@ -107,36 +121,22 @@ namespace CG
                 back.at(0) = node1;
                 back.at(1) = node2;
 
-                size_t fsize1 = node1->forward.size();
-                node1->forward.resize(fsize1+1);
-                node1->forward.at(fsize1) = this;
-                size_t fsize2 = node2->forward.size();
-                node2->forward.resize(fsize2+1);
-                node2->forward.at(fsize2) = this;
+                pushThis(node1);
+                pushThis(node2);
             };
 
-            virtual void forwardPropagation()
-            {   
-                if (++b_count < back.size()) {
-                    return;
-                } else { // When all the forward passes from the units in the preceding layer have been completed
-                    b_count = 0;
-                }
-
+            virtual void calcData()
+            {
                 for (int i=0; i<bsize; ++i) {
                     data.at(i) = back.at(0)->data.at(i) + back.at(1)->data.at(i);
-                }
-
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
                 }
             }
 
             virtual void calcPartialDerivative()
             {   
                 for (int i=0; i<bsize; ++i) {
-                    back.at(0)->grad.at(i) = 1 * grad.at(i);
-                    back.at(1)->grad.at(i) = 1 * grad.at(i);
+                    back.at(0)->grad.at(i) += 1 * grad.at(i);
+                    back.at(1)->grad.at(i) += 1 * grad.at(i);
                 }
             }
     };
@@ -146,28 +146,18 @@ namespace CG
         public :
             Sub (Node *node1, Node *node2) : Add (node1, node2){};
 
-            virtual void forwardPropagation()
-            {   
-                if (++b_count < back.size()) {
-                    return;
-                } else { // When all the forward passes from the units in the preceding layer have been completed
-                    b_count = 0;
-                }
-
+            virtual void calcData()
+            {
                 for (int i=0; i<bsize; ++i) {
                     data.at(i) = back.at(0)->data.at(i) - back.at(1)->data.at(i);
-                }
-
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
                 }
             }
 
             virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
-                    back.at(0)->grad.at(i) =  1 * grad.at(i);
-                    back.at(1)->grad.at(i) = -1 * grad.at(i);
+                    back.at(0)->grad.at(i) +=  1 * grad.at(i);
+                    back.at(1)->grad.at(i) += -1 * grad.at(i);
                 }
             }
     };
@@ -189,37 +179,23 @@ namespace CG
                 back.at(0) = node1;
                 back.at(1) = node2;
 
-                size_t fsize1 = node1->forward.size();
-                node1->forward.resize(fsize1+1);
-                node1->forward.at(fsize1) = this;
-                size_t fsize2 = node2->forward.size();
-                node2->forward.resize(fsize2+1);
-                node2->forward.at(fsize2) = this;
+                pushThis(node1);
+                pushThis(node2);
             };
 
-            virtual void forwardPropagation()
+            virtual void calcData()
             {   
-                if (++b_count < back.size()) {
-                    return;
-                } else { // When all the forward passes from the units in the preceding layer have been completed
-                    b_count = 0;
-                }
-
                 data.at(0) = 0;
                 for (int i=0; i<bsize; ++i) {
                     data.at(0) += back.at(0)->data.at(i) * back.at(1)->data.at(i);
-                }
-                
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
                 }
             }
 
             virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
-                    back.at(0)->grad.at(i) = back.at(1)->data.at(i) * grad.at(0);
-                    back.at(1)->grad.at(i) = back.at(0)->data.at(i) * grad.at(0);
+                    back.at(0)->grad.at(i) += back.at(1)->data.at(i) * grad.at(0);
+                    back.at(1)->grad.at(i) += back.at(0)->data.at(i) * grad.at(0);
                 }
             }
     };
@@ -251,19 +227,11 @@ namespace CG
                 back.resize(1);
                 back.at(0) = node1;
 
-                size_t fsize1 = node1->forward.size();
-                node1->forward.resize(fsize1+1);
-                node1->forward.at(fsize1) = this;
+                pushThis(node1);
             }
 
-            virtual void forwardPropagation()
+            virtual void calcData()
             {
-                if (++b_count < back.size()) {
-                    return;
-                } else { // When all the forward passes from the units in the preceding layer have been completed
-                    b_count = 0;
-                }
-
                 for (int i=0; i<data.size(); ++i) {
                     data.at(i) = 0;
                     for (int j=0; j<bsize; ++j) {
@@ -271,15 +239,11 @@ namespace CG
                     }
                     data.at(i) += Weight.at(bsize).at(i) * bias;
                 }
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
-                }
             }
 
             virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
-                    back.at(0)->grad.at(i) = 0;
                     for (int j=0; j<data.size(); ++j) {
                         back.at(0)->grad.at(i) += Weight.at(i).at(j) * grad.at(j);
                     }
@@ -306,6 +270,37 @@ namespace CG
             }
     };
 
+    class ReLU : public Node{
+        public :
+            ReLU (Node *node1)
+            {   
+                bsize = node1->data.size();
+                data.resize(bsize);
+                grad.resize(bsize);
+
+                forward.resize(0);
+
+                back.resize(1);
+                back.at(0) = node1;
+
+                pushThis(node1);
+            };
+
+            virtual void calcData()
+            {
+                for (int i=0; i<bsize; ++i) {
+                    data.at(i) = (back.at(0)->data.at(i) >= 0) ? back.at(0)->data.at(i) : 0;
+                }
+            }
+
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<bsize; ++i) {
+                    back.at(0)->grad.at(i) += (back.at(0)->data.at(i) >= 0) ? 1 * grad.at(i) : 0;
+                }
+            }
+    };
+
     class Norm2 : public Node
     {
         public :
@@ -320,34 +315,22 @@ namespace CG
                 back.resize(1);
                 back.at(0) = node1;
 
-                size_t fsize1 = node1->forward.size();
-                node1->forward.resize(fsize1+1);
-                node1->forward.at(fsize1) = this;
+                pushThis(node1);
             };
 
-            virtual void forwardPropagation()
+            virtual void calcData()
             {
-                if (++b_count < back.size()) {
-                    return;
-                } else { // When all the forward passes from the units in the preceding layer have been completed
-                    b_count = 0;
-                }
-
                 data.at(0) = 0;
                 for (int i=0; i<bsize; ++i) {
                     data.at(0) += back.at(0)->data.at(i) * back.at(0)->data.at(i);
                 }
                 data.at(0) = sqrt(data.at(0));
-
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
-                }
             }
             
             virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
-                    back.at(0)->grad.at(i) = back.at(0)->data.at(i) / data.at(0) * grad.at(0);
+                    back.at(0)->grad.at(i) += back.at(0)->data.at(i) / data.at(0) * grad.at(0);
                 }
             }
     };
@@ -357,32 +340,22 @@ namespace CG
         public : 
             MLE (Node *node1, Node *node2) : Dots (node1, node2){};
 
-            virtual void forwardPropagation()
+            virtual void calcData()
             {   
-                if (++b_count < back.size()) {
-                    return;
-                } else { // When all the forward passes from the units in the preceding layer have been completed
-                    b_count = 0;
-                }
-
                 data.at(0) = 0;
                 for (int i=0; i<bsize; ++i) {
                     dtype err = back.at(0)->data.at(i) - back.at(1)->data.at(i);
                     data.at(0) += err * err;
                 }
                 data.at(0) /= bsize;
-                
-                for (int i=0; i<forward.size(); ++i) {
-                    forward.at(i)->forwardPropagation();
-                }
             }
 
             virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
                     dtype err = back.at(0)->data.at(i) - back.at(1)->data.at(i);
-                    back.at(0)->grad.at(i) =   2 * err * grad.at(0) / bsize;
-                    back.at(1)->grad.at(i) = - 2 * err * grad.at(0) / bsize;
+                    back.at(0)->grad.at(i) +=   2 * err * grad.at(0) / bsize;
+                    back.at(1)->grad.at(i) += - 2 * err * grad.at(0) / bsize;
                 }
             }      
     };
