@@ -1,0 +1,12 @@
+n1 back size = 1
+n1 forw size = 0
+n1 data size = 1
+n1 data      = 5
+n1 grad size = 1
+n1 grad      = 1
+n1 back size = 1
+n1 forw size = 0
+n1 data size = 1
+n1 data      = 0.1
+n1 grad size = 1
+n1 grad      = 1

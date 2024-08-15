@@ -22,11 +22,10 @@ namespace CG
             Node (){}
 
             virtual void forwardPropagation(){}
-            virtual void calcPartialDerivative(dtype eta){}
-            void backPropagation(dtype eta)
-            {   
-                if (eta == 0) return;
 
+            virtual void calcPartialDerivative(){}
+            void backPropagation()
+            {   
                 if (++f_count < forward.size()) {
                     return;
                 } else { // When all the backpropagations from the units in the next layer have been completed
@@ -37,10 +36,30 @@ namespace CG
                     assert (data.size() == 1);
                     grad.at(0) = 1;
                 }
-                calcPartialDerivative(eta);
+                calcPartialDerivative();
 
                 for (int i=0; i<back.size(); ++i) {
-                    back.at(i)->backPropagation(eta);
+                    back.at(i)->backPropagation();
+                }
+            }
+
+            virtual void updateParameters(dtype eta){}
+            void update(dtype eta)
+            {
+                if (++f_count < forward.size()) {
+                    return;
+                } else { // When all the backpropagations from the units in the next layer have been completed
+                    f_count = 0;
+                }
+
+                if (forward.size() == 0) {
+                    assert (data.size() == 1);
+                    grad.at(0) = 1;
+                }
+                updateParameters(eta);
+
+                for (int i=0; i<back.size(); ++i) {
+                    back.at(i)->update(eta);
                 }
             }
     };
@@ -113,8 +132,7 @@ namespace CG
                 }
             }
 
-
-            virtual void calcPartialDerivative(dtype eta)
+            virtual void calcPartialDerivative()
             {   
                 for (int i=0; i<bsize; ++i) {
                     back.at(0)->grad.at(i) = 1 * grad.at(i);
@@ -145,7 +163,7 @@ namespace CG
                 }
             }
 
-            virtual void calcPartialDerivative(dtype eta)
+            virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
                     back.at(0)->grad.at(i) =  1 * grad.at(i);
@@ -197,7 +215,7 @@ namespace CG
                 }
             }
 
-            virtual void calcPartialDerivative(dtype eta)
+            virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
                     back.at(0)->grad.at(i) = back.at(1)->data.at(i) * grad.at(0);
@@ -210,6 +228,7 @@ namespace CG
     {
         public :
             vec2<dtype> Weight;
+            vec2<dtype> gradWeight;
             dtype       bias = 1;
 
             Affine (Node *node1, vec2<dtype> W)
@@ -220,6 +239,10 @@ namespace CG
 
                 bsize = node1->data.size();
                 size_t osize = W.at(0).size();
+                gradWeight.resize(bsize+1);
+                for (int i=0; i<=bsize; ++i) {
+                    gradWeight.at(i).resize(osize);
+                }
                 data.resize(osize);
                 grad.resize(osize);
 
@@ -253,7 +276,7 @@ namespace CG
                 }
             }
 
-            virtual void calcPartialDerivative(dtype eta)
+            virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
                     back.at(0)->grad.at(i) = 0;
@@ -264,11 +287,21 @@ namespace CG
 
                 for (int i=0; i<bsize; ++i) {
                     for (int j=0; j<data.size(); ++j) {
-                        Weight.at(i).at(j) -= eta * back.at(0)->data.at(i) * grad.at(j);
+                        gradWeight.at(i).at(j) += back.at(0)->data.at(i) * grad.at(j);
                     }
                 }
                 for (int j=0; j<data.size(); ++j) {
-                    Weight.at(bsize).at(j) -= eta * grad.at(j);
+                    gradWeight.at(bsize).at(j) += grad.at(j);
+                }
+            }
+
+            virtual void updateParameters(dtype eta)
+            {
+                for (int i=0; i<=bsize; ++i) {
+                    for (int j=0; j<data.size(); ++j) {
+                        Weight.at(i).at(j) -= eta * gradWeight.at(i).at(j);
+                        gradWeight.at(i).at(j) = 0;
+                    }
                 }
             }
     };
@@ -311,7 +344,7 @@ namespace CG
                 }
             }
             
-            virtual void calcPartialDerivative(dtype eta)
+            virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
                     back.at(0)->grad.at(i) = back.at(0)->data.at(i) / data.at(0) * grad.at(0);
@@ -344,7 +377,7 @@ namespace CG
                 }
             }
 
-            virtual void calcPartialDerivative(dtype eta)
+            virtual void calcPartialDerivative()
             {
                 for (int i=0; i<bsize; ++i) {
                     dtype err = back.at(0)->data.at(i) - back.at(1)->data.at(i);
