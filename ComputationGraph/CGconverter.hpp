@@ -15,7 +15,6 @@ namespace CGC
     {
         public :
             std::map<CG::Node*, int> p2i;
-            std::map<int, CG::Node*> i2p;
 
             Converter ();
 
@@ -23,7 +22,7 @@ namespace CGC
 
             void convert(CG::Node *node, int *id, std::ofstream *out);
 
-            void toString(CG::Node *node,  std::ofstream *out);
+            void toString(CG::Node *node, int *id, std::ofstream *out);
     };
 }
 
