@@ -1,3 +1,8 @@
+#ifndef CGC_HPP
+#define CGC_HPP
+
+#include <map>
+#include <fstream>
 #include "CG.hpp"
 
 namespace CGC
@@ -6,8 +11,20 @@ namespace CGC
     template<typename T> using vec2 = CG::vec2<T>;
     using dtype = CG::dtype;
 
-    void Convert(CG::Node *node) {
-        int id = 0;
-        
-    }
+    class Converter
+    {
+        public :
+            std::map<CG::Node*, int> p2i;
+            std::map<int, CG::Node*> i2p;
+
+            Converter ();
+
+            void convertAll(CG::Node *top, std::string filename);
+
+            void convert(CG::Node *node, int *id, std::ofstream *out);
+
+            void toString(CG::Node *node,  std::ofstream *out);
+    };
 }
+
+#endif
