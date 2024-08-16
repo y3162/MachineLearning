@@ -85,6 +85,86 @@ namespace CG
             }
     };
 
+    class MMtoM : public Node
+    {
+        public :
+            MMtoM (Node *node1, Node *node2)
+            {   
+                assert (node1->data.size() == node2->data.size());
+
+                bsize = node1->data.size();
+                data.resize(bsize);
+                grad.resize(bsize);
+
+                forward.resize(0);
+
+                backward.resize(2);
+                backward.at(0) = node1;
+                backward.at(1) = node2;
+
+                pushThis(node1);
+                pushThis(node2);
+            };
+    };
+
+    class MMto1 : public Node
+    {
+        public :
+            MMto1 (Node *node1, Node *node2)
+            {   
+                assert (node1->data.size() == node2->data.size());
+
+                bsize = node1->data.size();
+                data.resize(1);
+                grad.resize(1);
+
+                forward.resize(0);
+
+                backward.resize(2);
+                backward.at(0) = node1;
+                backward.at(1) = node2;
+
+                pushThis(node1);
+                pushThis(node2);
+            };
+    };
+
+    class MtoM : public Node
+    {
+        public :
+            MtoM (Node *node1)
+            {   
+                bsize = node1->data.size();
+                data.resize(bsize);
+                grad.resize(bsize);
+
+                forward.resize(0);
+
+                backward.resize(1);
+                backward.at(0) = node1;
+
+                pushThis(node1);
+            };
+    };
+
+    class Mto1 : public Node
+    {
+        public :
+            Mto1 (Node *node1)
+            {   
+                bsize = node1->data.size();
+                data.resize(1);
+                grad.resize(1);
+
+                forward.resize(0);
+
+                backward.resize(1);
+                backward.at(0) = node1;
+
+                pushThis(node1);
+            };
+    };
+
     class Leaf : public Node
     {
         public :
@@ -104,26 +184,10 @@ namespace CG
             }
     };
 
-    class Add : public Node
+    class Add : public MMtoM
     {   
         public :
-            Add (Node *node1, Node *node2)
-            {   
-                assert (node1->data.size() == node2->data.size());
-
-                bsize = node1->data.size();
-                data.resize(bsize);
-                grad.resize(bsize);
-
-                forward.resize(0);
-
-                backward.resize(2);
-                backward.at(0) = node1;
-                backward.at(1) = node2;
-
-                pushThis(node1);
-                pushThis(node2);
-            };
+            Add (Node *node1, Node *node2) : MMtoM (node1, node2){};
 
             virtual void calcData()
             {
@@ -141,10 +205,10 @@ namespace CG
             }
     };
 
-    class Sub : public Add
+    class Sub : public MMtoM
     {
         public :
-            Sub (Node *node1, Node *node2) : Add (node1, node2){};
+            Sub (Node *node1, Node *node2) : MMtoM (node1, node2){};
 
             virtual void calcData()
             {
@@ -162,26 +226,10 @@ namespace CG
             }
     };
 
-    class Dots : public Node
+    class Dots : public MMto1
     {
         public :
-            Dots (Node *node1, Node *node2)
-            {   
-                assert (node1->data.size() == node2->data.size());
-
-                bsize = node1->data.size();
-                data.resize(1);
-                grad.resize(1);
-
-                forward.resize(0);
-
-                backward.resize(2);
-                backward.at(0) = node1;
-                backward.at(1) = node2;
-
-                pushThis(node1);
-                pushThis(node2);
-            };
+            Dots (Node *node1, Node *node2) : MMto1 (node1, node2){};
 
             virtual void calcData()
             {   
@@ -196,6 +244,110 @@ namespace CG
                 for (int i=0; i<bsize; ++i) {
                     backward.at(0)->grad.at(i) += backward.at(1)->data.at(i) * grad.at(0);
                     backward.at(1)->grad.at(i) += backward.at(0)->data.at(i) * grad.at(0);
+                }
+            }
+    };
+
+    class MLE : public MMto1
+    {
+        public : 
+            MLE (Node *node1, Node *node2) : MMto1 (node1, node2){};
+
+            virtual void calcData()
+            {   
+                data.at(0) = 0;
+                for (int i=0; i<bsize; ++i) {
+                    dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
+                    data.at(0) += err * err;
+                }
+                data.at(0) /= bsize;
+            }
+
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<bsize; ++i) {
+                    dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
+                    backward.at(0)->grad.at(i) +=   2 * err * grad.at(0) / bsize;
+                    backward.at(1)->grad.at(i) += - 2 * err * grad.at(0) / bsize;
+                }
+            }      
+    };
+
+    class ReLU : public MtoM
+    {
+        public :
+            ReLU (Node *node1) : MtoM (node1){};
+
+            virtual void calcData()
+            {
+                for (int i=0; i<bsize; ++i) {
+                    data.at(i) = (backward.at(0)->data.at(i) >= 0) ? backward.at(0)->data.at(i) : 0;
+                }
+            }
+
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<bsize; ++i) {
+                    backward.at(0)->grad.at(i) += (backward.at(0)->data.at(i) >= 0) ? 1 * grad.at(i) : 0;
+                }
+            }
+    };
+
+    class Softmax : public MtoM
+    {
+        public : 
+            Softmax (Node *node1) : MtoM (node1){}
+
+            virtual void calcData()
+            {
+                dtype max = backward.at(0)->data.at(0);
+                for (int i=1; i<bsize; ++i) {
+                    max = std::max(max, backward.at(0)->data.at(i));
+                }
+
+                dtype sum = 0;
+                for (int i=0; i<bsize; ++i) {
+                    dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
+                    sum += std::exp(z);
+                }
+
+                for (int i=0; i<bsize; ++i) {
+                    dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
+                    data.at(i) = std::exp(z) / sum;
+                }
+            }
+
+            virtual void calcPartialDerivative() 
+            {
+                for (int i=0; i<bsize; ++i) {
+                    for (int j=0; j<bsize; ++j) {
+                        if (i == j) 
+                            backward.at(0)->grad.at(i) += (1 - data.at(i)) * data.at(j) * grad.at(j);
+                        else
+                            backward.at(0)->grad.at(i) +=    - data.at(i)  * data.at(j) * grad.at(j);
+                    }
+                }
+            }
+    };
+
+    class Norm2 : public Mto1
+    {
+        public :
+            Norm2 (Node *node1) : Mto1 (node1){};
+
+            virtual void calcData()
+            {
+                data.at(0) = 0;
+                for (int i=0; i<bsize; ++i) {
+                    data.at(0) += backward.at(0)->data.at(i) * backward.at(0)->data.at(i);
+                }
+                data.at(0) = sqrt(data.at(0));
+            }
+            
+            virtual void calcPartialDerivative()
+            {
+                for (int i=0; i<bsize; ++i) {
+                    backward.at(0)->grad.at(i) += backward.at(0)->data.at(i) / data.at(0) * grad.at(0);
                 }
             }
     };
@@ -268,133 +420,6 @@ namespace CG
                     }
                 }
             }
-    };
-
-    class ReLU : public Node{
-        public :
-            ReLU (Node *node1)
-            {   
-                bsize = node1->data.size();
-                data.resize(bsize);
-                grad.resize(bsize);
-
-                forward.resize(0);
-
-                backward.resize(1);
-                backward.at(0) = node1;
-
-                pushThis(node1);
-            };
-
-            virtual void calcData()
-            {
-                for (int i=0; i<bsize; ++i) {
-                    data.at(i) = (backward.at(0)->data.at(i) >= 0) ? backward.at(0)->data.at(i) : 0;
-                }
-            }
-
-            virtual void calcPartialDerivative()
-            {
-                for (int i=0; i<bsize; ++i) {
-                    backward.at(0)->grad.at(i) += (backward.at(0)->data.at(i) >= 0) ? 1 * grad.at(i) : 0;
-                }
-            }
-    };
-
-    class Softmax : public ReLU
-    {
-        public : 
-            Softmax (Node *node1) : ReLU (node1){}
-
-            virtual void calcData()
-            {
-                dtype max = backward.at(0)->data.at(0);
-                for (int i=1; i<bsize; ++i) {
-                    max = std::max(max, backward.at(0)->data.at(i));
-                }
-
-                dtype sum = 0;
-                for (int i=0; i<bsize; ++i) {
-                    dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
-                    sum += std::exp(z);
-                }
-
-                for (int i=0; i<bsize; ++i) {
-                    dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
-                    data.at(i) = std::exp(z) / sum;
-                }
-            }
-
-            virtual void calcPartialDerivative() 
-            {
-                for (int i=0; i<bsize; ++i) {
-                    for (int j=0; j<bsize; ++j) {
-                        if (i == j) 
-                            backward.at(0)->grad.at(i) += (1 - data.at(i)) * data.at(j) * grad.at(j);
-                        else
-                            backward.at(0)->grad.at(i) +=    - data.at(i)  * data.at(j) * grad.at(j);
-                    }
-                }
-            }
-    };
-
-    class Norm2 : public Node
-    {
-        public :
-            Norm2 (Node *node1)
-            {   
-                bsize = node1->data.size();
-                data.resize(1);
-                grad.resize(1);
-
-                forward.resize(0);
-
-                backward.resize(1);
-                backward.at(0) = node1;
-
-                pushThis(node1);
-            };
-
-            virtual void calcData()
-            {
-                data.at(0) = 0;
-                for (int i=0; i<bsize; ++i) {
-                    data.at(0) += backward.at(0)->data.at(i) * backward.at(0)->data.at(i);
-                }
-                data.at(0) = sqrt(data.at(0));
-            }
-            
-            virtual void calcPartialDerivative()
-            {
-                for (int i=0; i<bsize; ++i) {
-                    backward.at(0)->grad.at(i) += backward.at(0)->data.at(i) / data.at(0) * grad.at(0);
-                }
-            }
-    };
-
-    class MLE : public Dots
-    {
-        public : 
-            MLE (Node *node1, Node *node2) : Dots (node1, node2){};
-
-            virtual void calcData()
-            {   
-                data.at(0) = 0;
-                for (int i=0; i<bsize; ++i) {
-                    dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
-                    data.at(0) += err * err;
-                }
-                data.at(0) /= bsize;
-            }
-
-            virtual void calcPartialDerivative()
-            {
-                for (int i=0; i<bsize; ++i) {
-                    dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
-                    backward.at(0)->grad.at(i) +=   2 * err * grad.at(0) / bsize;
-                    backward.at(1)->grad.at(i) += - 2 * err * grad.at(0) / bsize;
-                }
-            }      
     };
 
     void dumpNode (Node const node1, std::string name)
