@@ -15,7 +15,7 @@ namespace CG
             vec1<dtype> grad;
             vec1<Node*> forward;
             vec1<Node*> backward;
-            size_t      bsize;
+            size_t      domsize;
             int         f_count = 0;
             int         b_count = 0;
 
@@ -92,9 +92,9 @@ namespace CG
             {   
                 assert (node1->data.size() == node2->data.size());
 
-                bsize = node1->data.size();
-                data.resize(bsize);
-                grad.resize(bsize);
+                domsize = node1->data.size();
+                data.resize(domsize);
+                grad.resize(domsize);
 
                 forward.resize(0);
 
@@ -114,7 +114,7 @@ namespace CG
             {   
                 assert (node1->data.size() == node2->data.size());
 
-                bsize = node1->data.size();
+                domsize = node1->data.size();
                 data.resize(1);
                 grad.resize(1);
 
@@ -134,9 +134,9 @@ namespace CG
         public :
             MtoM (Node *node1)
             {   
-                bsize = node1->data.size();
-                data.resize(bsize);
-                grad.resize(bsize);
+                domsize = node1->data.size();
+                data.resize(domsize);
+                grad.resize(domsize);
 
                 forward.resize(0);
 
@@ -152,7 +152,7 @@ namespace CG
         public :
             Mto1 (Node *node1)
             {   
-                bsize = node1->data.size();
+                domsize = node1->data.size();
                 data.resize(1);
                 grad.resize(1);
 
@@ -170,7 +170,7 @@ namespace CG
         public :
             Leaf (size_t size)
             {
-                bsize = 0;
+                domsize = 0;
                 data.resize(size);
                 grad.resize(size);
                 forward.resize(0);
@@ -191,14 +191,14 @@ namespace CG
 
             virtual void calcData()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     data.at(i) = backward.at(0)->data.at(i) + backward.at(1)->data.at(i);
                 }
             }
 
             virtual void calcPartialDerivative()
             {   
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     backward.at(0)->grad.at(i) += 1 * grad.at(i);
                     backward.at(1)->grad.at(i) += 1 * grad.at(i);
                 }
@@ -212,14 +212,14 @@ namespace CG
 
             virtual void calcData()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     data.at(i) = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
                 }
             }
 
             virtual void calcPartialDerivative()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     backward.at(0)->grad.at(i) +=  1 * grad.at(i);
                     backward.at(1)->grad.at(i) += -1 * grad.at(i);
                 }
@@ -234,14 +234,14 @@ namespace CG
             virtual void calcData()
             {   
                 data.at(0) = 0;
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     data.at(0) += backward.at(0)->data.at(i) * backward.at(1)->data.at(i);
                 }
             }
 
             virtual void calcPartialDerivative()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     backward.at(0)->grad.at(i) += backward.at(1)->data.at(i) * grad.at(0);
                     backward.at(1)->grad.at(i) += backward.at(0)->data.at(i) * grad.at(0);
                 }
@@ -256,19 +256,19 @@ namespace CG
             virtual void calcData()
             {   
                 data.at(0) = 0;
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
                     data.at(0) += err * err;
                 }
-                data.at(0) /= bsize;
+                data.at(0) /= domsize;
             }
 
             virtual void calcPartialDerivative()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
-                    backward.at(0)->grad.at(i) +=   2 * err * grad.at(0) / bsize;
-                    backward.at(1)->grad.at(i) += - 2 * err * grad.at(0) / bsize;
+                    backward.at(0)->grad.at(i) +=   2 * err * grad.at(0) / domsize;
+                    backward.at(1)->grad.at(i) += - 2 * err * grad.at(0) / domsize;
                 }
             }      
     };
@@ -280,14 +280,14 @@ namespace CG
 
             virtual void calcData()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     data.at(i) = (backward.at(0)->data.at(i) >= 0) ? backward.at(0)->data.at(i) : 0;
                 }
             }
 
             virtual void calcPartialDerivative()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     backward.at(0)->grad.at(i) += (backward.at(0)->data.at(i) >= 0) ? 1 * grad.at(i) : 0;
                 }
             }
@@ -301,17 +301,17 @@ namespace CG
             virtual void calcData()
             {
                 dtype max = backward.at(0)->data.at(0);
-                for (int i=1; i<bsize; ++i) {
+                for (int i=1; i<domsize; ++i) {
                     max = std::max(max, backward.at(0)->data.at(i));
                 }
 
                 dtype sum = 0;
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
                     sum += std::exp(z);
                 }
 
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
                     data.at(i) = std::exp(z) / sum;
                 }
@@ -319,8 +319,8 @@ namespace CG
 
             virtual void calcPartialDerivative() 
             {
-                for (int i=0; i<bsize; ++i) {
-                    for (int j=0; j<bsize; ++j) {
+                for (int i=0; i<domsize; ++i) {
+                    for (int j=0; j<domsize; ++j) {
                         if (i == j) 
                             backward.at(0)->grad.at(i) += (1 - data.at(i)) * data.at(j) * grad.at(j);
                         else
@@ -338,7 +338,7 @@ namespace CG
             virtual void calcData()
             {
                 data.at(0) = 0;
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     data.at(0) += backward.at(0)->data.at(i) * backward.at(0)->data.at(i);
                 }
                 data.at(0) = sqrt(data.at(0));
@@ -346,7 +346,7 @@ namespace CG
             
             virtual void calcPartialDerivative()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     backward.at(0)->grad.at(i) += backward.at(0)->data.at(i) / data.at(0) * grad.at(0);
                 }
             }
@@ -365,10 +365,10 @@ namespace CG
                 
                 Weight = W;
 
-                bsize = node1->data.size();
+                domsize = node1->data.size();
                 size_t osize = W.at(0).size();
-                gradWeight.resize(bsize+1);
-                for (int i=0; i<=bsize; ++i) {
+                gradWeight.resize(domsize+1);
+                for (int i=0; i<=domsize; ++i) {
                     gradWeight.at(i).resize(osize);
                 }
                 data.resize(osize);
@@ -386,34 +386,34 @@ namespace CG
             {
                 for (int i=0; i<data.size(); ++i) {
                     data.at(i) = 0;
-                    for (int j=0; j<bsize; ++j) {
+                    for (int j=0; j<domsize; ++j) {
                         data.at(i) += Weight.at(j).at(i) * backward.at(0)->data.at(j);
                     }
-                    data.at(i) += Weight.at(bsize).at(i) * bias;
+                    data.at(i) += Weight.at(domsize).at(i) * bias;
                 }
             }
 
             virtual void calcPartialDerivative()
             {
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     for (int j=0; j<data.size(); ++j) {
                         backward.at(0)->grad.at(i) += Weight.at(i).at(j) * grad.at(j);
                     }
                 }
 
-                for (int i=0; i<bsize; ++i) {
+                for (int i=0; i<domsize; ++i) {
                     for (int j=0; j<data.size(); ++j) {
                         gradWeight.at(i).at(j) += backward.at(0)->data.at(i) * grad.at(j);
                     }
                 }
                 for (int j=0; j<data.size(); ++j) {
-                    gradWeight.at(bsize).at(j) += grad.at(j);
+                    gradWeight.at(domsize).at(j) += grad.at(j);
                 }
             }
 
             virtual void updateParameters(dtype eta)
             {
-                for (int i=0; i<=bsize; ++i) {
+                for (int i=0; i<=domsize; ++i) {
                     for (int j=0; j<data.size(); ++j) {
                         Weight.at(i).at(j) -= eta * gradWeight.at(i).at(j);
                         gradWeight.at(i).at(j) = 0;
