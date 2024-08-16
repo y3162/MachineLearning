@@ -85,6 +85,25 @@ namespace CG
             }
     };
 
+    class Leaf : public Node
+    {
+        public :
+            Leaf (size_t size)
+            {
+                domsize = 0;
+                data.resize(size);
+                grad.resize(size);
+                forward.resize(0);
+                backward.resize(0);
+            }
+
+            void getInput(vec1<dtype> input)
+            {
+                assert (data.size() == input.size());
+                data = input;
+            }
+    };
+
     class MMtoM : public Node
     {
         public :
@@ -163,25 +182,6 @@ namespace CG
 
                 pushThis(node1);
             };
-    };
-
-    class Leaf : public Node
-    {
-        public :
-            Leaf (size_t size)
-            {
-                domsize = 0;
-                data.resize(size);
-                grad.resize(size);
-                forward.resize(0);
-                backward.resize(0);
-            }
-
-            void getInput(vec1<dtype> input)
-            {
-                assert (data.size() == input.size());
-                data = input;
-            }
     };
 
     class Add : public MMtoM
