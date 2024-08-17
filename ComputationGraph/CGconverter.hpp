@@ -1,6 +1,7 @@
 #ifndef CGC_HPP
 #define CGC_HPP
 
+#include <string>
 #include <map>
 #include <fstream>
 #include "CG.hpp"
@@ -14,15 +15,17 @@ namespace CGC
     class Converter
     {
         public :
+            int *id;
             std::map<CG::Node*, int> p2i;
+            std::ofstream *out;
 
             Converter ();
 
             void convertAll(CG::Node *top, std::string filename);
 
-            void convert(CG::Node *node, int *id, std::ofstream *out);
+            void convert(CG::Node *node);
 
-            void toString(CG::Node *node, int *id, std::ofstream *out);
+            void toString(CG::Node *node);
     };
 }
 
