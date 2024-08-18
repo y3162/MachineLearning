@@ -144,7 +144,7 @@ namespace CG
             vec2<dtype> gradWeight;
             dtype       bias = 1;
 
-            Affine (Node *node1, vec2<dtype> W);
+            Affine (Node *node1, const vec2<dtype> W);
 
             virtual void calcData();
 

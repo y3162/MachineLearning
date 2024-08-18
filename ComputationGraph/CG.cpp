@@ -316,7 +316,7 @@ namespace CG
 
     
     
-    Affine::Affine (Node *node1, vec2<dtype> W)
+    Affine::Affine (Node *node1, const vec2<dtype> W)
     {
         assert (node1->data.size() + 1 == W.size());
         
