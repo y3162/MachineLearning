@@ -49,13 +49,13 @@ namespace CGG
 
 
 
-    NN::NN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss)
+    FNN::FNN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss)
     : input(input), target(target), output(output), loss(loss)
     {
         assert (loss->data.size() == 1);
     }
 
-    vec1<dtype> NN::expect(const vec1<dtype> expectData)
+    vec1<dtype> FNN::expect(const vec1<dtype> expectData)
     {
         input->getInput(expectData);
 
@@ -65,7 +65,7 @@ namespace CGG
         return output->data;
     }
 
-    dtype NN::test(const vec1<dtype> testData, const vec1<dtype> targetData)
+    dtype FNN::test(const vec1<dtype> testData, const vec1<dtype> targetData)
     {
         input->getInput(testData);
         target->getInput(targetData);
@@ -77,7 +77,7 @@ namespace CGG
         return ret;
     }
 
-    dtype NN::train(const vec1<dtype> trainData, const vec1<dtype> targetData)
+    dtype FNN::train(const vec1<dtype> trainData, const vec1<dtype> targetData)
     {
         input->getInput(trainData);
         target->getInput(targetData);
@@ -89,14 +89,14 @@ namespace CGG
         return loss->data.at(0);
     }
 
-    void NN::update(dtype eta)
+    void FNN::update(dtype eta)
     {
         loss->update(eta);
     }
 
 
 
-    NN* parseFeedForward(std::string filename)
+    FNN* parseFeedForward(std::string filename)
     {
         CGP::Parser P;
         CG::Node *loss = P.parseAll(filename);
@@ -112,10 +112,10 @@ namespace CGG
 
         CG::Leaf *input = dynamic_cast<CG::Leaf*>(temp);
 
-        return new NN(input, target, output, loss);
+        return new FNN(input, target, output, loss);
     }
 
-    NN* feedForwardReLU(const vec1<size_t> nodes, std::string lossType)
+    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string lossType)
     {   
         CG::Leaf* input  = new CG::Leaf(nodes.at(0));
         CG::Node* output = input;
@@ -130,6 +130,6 @@ namespace CGG
 
         CG::Node* loss = setLossFunction(output, target, "MLE");
 
-        return new NN(input, target, output, loss);
+        return new FNN(input, target, output, loss);
     }
 }

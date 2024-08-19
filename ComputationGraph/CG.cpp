@@ -1,7 +1,8 @@
-#include "CG.hpp"
 #include <iostream>
 #include <cassert>
 #include <vector>
+#include "CG.hpp"
+#include "Type.hpp"
 
 namespace CG
 {

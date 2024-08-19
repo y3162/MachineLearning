@@ -4,12 +4,13 @@
 #include <iostream>
 #include <cassert>
 #include <vector>
+#include "Type.hpp"
 
 namespace CG
 {
-    template<typename T> using vec1 = std::vector<T>;
-    template<typename T> using vec2 = vec1<vec1<T>>;
-    using dtype = double;
+    template<typename T> using vec1 = type::vec1<T>;
+    template<typename T> using vec2 = type::vec2<T>;
+    using dtype = type::dtype;
 
     class Node
     {

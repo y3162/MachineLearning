@@ -7,10 +7,6 @@
 
 namespace CGP
 {
-    template<typename T> using vec1 = CG::vec1<T>;
-    template<typename T> using vec2 = CG::vec2<T>;
-    using dtype = CG::dtype;
-
     Parser::Parser (){};
 
     CG::Node* Parser::parseAll(std::string filename)

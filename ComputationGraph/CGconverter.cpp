@@ -1,6 +1,7 @@
 #include <string>
 #include <map>
 #include <fstream>
+#include "Type.hpp"
 #include "CG.hpp"
 #include "CGconverter.hpp"
 

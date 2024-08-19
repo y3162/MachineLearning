@@ -14,7 +14,7 @@ namespace CGG
 
     CG::Node* setLossFunction(CG::Node *output, CG::Node *target, std::string lossType);
 
-    class NN
+    class FNN
     {
         public :
             CG::Leaf *input;
@@ -22,7 +22,7 @@ namespace CGG
             CG::Node *output;
             CG::Node *loss;
 
-            NN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss);
+            FNN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss);
 
             vec1<dtype> expect(const vec1<dtype> expectData);
 
@@ -33,9 +33,9 @@ namespace CGG
             void update(dtype eta);
     };
 
-    NN* parseFeedForward(std::string filename);
+    FNN* parseFeedForward(std::string filename);
 
-    NN* feedForwardReLU(const vec1<size_t> nodes, std::string lossType);
+    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string lossType);
 }
 
 #endif
