@@ -14,6 +14,8 @@ namespace CGG
 
     CG::Node* setLossFunction(CG::Node *output, CG::Node *target, std::string lossType);
 
+    CG::Node* setNormalizationFunction(CG::Node *output, std::string normalizationType);
+
     class FNN
     {
         public :
@@ -35,7 +37,7 @@ namespace CGG
 
     FNN* parseFeedForward(std::string filename);
 
-    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string lossType);
+    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string normalizationType, std::string lossType);
 }
 
 #endif

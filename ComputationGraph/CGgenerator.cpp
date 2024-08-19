@@ -47,6 +47,17 @@ namespace CGG
         }
     }
 
+    CG::Node* setNormalizationFunction(CG::Node *output, std::string normalizationType)
+    {
+        if (normalizationType == "") {
+            return output;
+        } else if (normalizationType == "Softmax") {
+            return new CG::Softmax(output);
+        } else {
+            assert (false);
+        }
+    }
+
 
 
     FNN::FNN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss)
@@ -73,8 +84,7 @@ namespace CGG
         input->forwardPropagation();
         target->forwardPropagation();
 
-        dtype ret = loss->data.at(0);
-        return ret;
+        return loss->data.at(0);
     }
 
     dtype FNN::train(const vec1<dtype> trainData, const vec1<dtype> targetData)
@@ -115,7 +125,7 @@ namespace CGG
         return new FNN(input, target, output, loss);
     }
 
-    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string lossType)
+    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string normlizationType, std::string lossType)
     {   
         CG::Leaf* input  = new CG::Leaf(nodes.at(0));
         CG::Node* output = input;
@@ -125,6 +135,8 @@ namespace CGG
             output = new CG::ReLU(output);
             output = new CG::Affine(output, initWeight("He", nodes.at(i), nodes.at(i + 1)));
         }
+        
+        output = setNormalizationFunction(output, normlizationType);
 
         CG::Leaf* target = new CG::Leaf(nodes.at(nodes.size() - 1));
 
