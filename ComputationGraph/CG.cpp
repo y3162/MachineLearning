@@ -73,16 +73,18 @@ namespace CG
 
 
 
-    Leaf::Leaf (size_t size)
+    Leaf1::Leaf1 (size_t size)
     {
         domsize = 0;
+        height  = size;
+        width   = 1;  
         data.resize(size);
         grad.resize(size);
         forward.resize(0);
         backward.resize(0);
     }
 
-    void Leaf::getInput(vec1<dtype> input)
+    void Leaf1::getInput(const vec1<dtype> input)
     {
         assert (data.size() == input.size());
         data = input;
@@ -90,11 +92,44 @@ namespace CG
 
 
 
+    Leaf2::Leaf2 (size_t height, size_t width)
+    {
+        domsize = 0;
+        this->height = height;
+        this->width  = width;
+        data.resize(height * width);
+        grad.resize(height * width);
+        forward.resize(0);
+        backward.resize(0);
+    }
+
+    void Leaf2::getInput(const vec1<dtype> input)
+    {
+        assert (data.size() == input.size());
+        data = input;
+    }
+
+    void Leaf2::getInput(const vec2<dtype> input)
+    {
+        assert (data.size() == input.size() * input.at(0).size());
+        for (int i=0; i<height; ++i) {
+            for (int j=0; j<width; ++j) {
+                data.at(i * width + j) = input.at(i).at(j);
+            }
+        }
+    }
+
+
+
     MMtoM::MMtoM (Node *node1, Node *node2)
     {   
         assert (node1->data.size() == node2->data.size());
+        assert (node1->height == node2->height);
+        assert (node1->width  == node2->width);
 
         domsize = node1->data.size();
+        height = node1->height;
+        width  = node2->width;
         data.resize(domsize);
         grad.resize(domsize);
 
@@ -113,8 +148,12 @@ namespace CG
     MMto1::MMto1 (Node *node1, Node *node2)
     {   
         assert (node1->data.size() == node2->data.size());
+        assert (node1->height == node2->height);
+        assert (node1->width  == node2->width);
 
         domsize = node1->data.size();
+        height = 1;
+        width  = 1;
         data.resize(1);
         grad.resize(1);
 
@@ -133,6 +172,8 @@ namespace CG
     MtoM::MtoM (Node *node1)
     {   
         domsize = node1->data.size();
+        height  = node1->height;
+        width   = node1->width;
         data.resize(domsize);
         grad.resize(domsize);
 
@@ -149,6 +190,8 @@ namespace CG
     Mto1::Mto1 (Node *node1)
     {   
         domsize = node1->data.size();
+        height  = 1;
+        width   = 1;
         data.resize(1);
         grad.resize(1);
 
@@ -220,9 +263,9 @@ namespace CG
 
 
 
-    MLE::MLE (Node *node1, Node *node2) : MMto1 (node1, node2){};
+    MSE::MSE (Node *node1, Node *node2) : MMto1 (node1, node2){};
 
-    void MLE::calcData()
+    void MSE::calcData()
     {   
         data.at(0) = 0;
         for (int i=0; i<domsize; ++i) {
@@ -232,14 +275,36 @@ namespace CG
         data.at(0) /= domsize;
     }
 
-    void MLE::calcPartialDerivative()
+    void MSE::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
             dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
             backward.at(0)->grad.at(i) +=   2 * err * grad.at(0) / domsize;
             backward.at(1)->grad.at(i) += - 2 * err * grad.at(0) / domsize;
         }
-    }      
+    }
+
+
+
+    CEE::CEE (Node *node1, Node *node2) : MMto1 (node1, node2){};
+
+    void CEE::calcData()
+    {
+        data.at(0) = 0;
+        for (int i=0; i<domsize; ++i) {
+            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-200);
+            data.at(0) -= backward.at(1)->data.at(i) * std::log(d1);
+        }
+    }
+
+    void CEE::calcPartialDerivative()
+    {
+        for (int i=0; i<domsize; ++i) {
+            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-200);
+            backward.at(0)->grad.at(i) -= backward.at(1)->data.at(i) / d1 * grad.at(0);
+            backward.at(1)->grad.at(i) -= std::log(backward.at(0)->data.at(i)) * grad.at(0);
+        }
+    }
 
     
     
@@ -320,6 +385,7 @@ namespace CG
     Affine::Affine (Node *node1, const vec2<dtype> W)
     {
         assert (node1->data.size() + 1 == W.size());
+        assert (node1->width == 1);
         
         Weight = W;
 

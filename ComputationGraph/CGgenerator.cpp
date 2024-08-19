@@ -40,8 +40,10 @@ namespace CGG
 
     CG::Node* setLossFunction(CG::Node *output, CG::Node *target, std::string lossType)
     {
-        if (lossType == "MLE") {
-            return new CG::MLE(output, target);
+        if (lossType == "MSE") {
+            return new CG::MSE(output, target);
+        } else if (lossType == "CEE") {
+            return new CG::CEE(output, target);
         } else {
             assert (false);
         }
@@ -140,7 +142,7 @@ namespace CGG
 
         CG::Leaf* target = new CG::Leaf(nodes.at(nodes.size() - 1));
 
-        CG::Node* loss = setLossFunction(output, target, "MLE");
+        CG::Node* loss = setLossFunction(output, target, lossType);
 
         return new FNN(input, target, output, loss);
     }

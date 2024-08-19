@@ -20,6 +20,8 @@ namespace CG
             vec1<Node*> forward;
             vec1<Node*> backward;
             size_t      domsize;
+            size_t      height;
+            size_t      width;
             int         f_count = 0;
             int         b_count = 0;
 
@@ -37,12 +39,21 @@ namespace CG
             void update(dtype eta);
     };
 
-    class Leaf : public Node
+    class Leaf1 : public Node
     {
         public :
-            Leaf (size_t size);
+            Leaf1 (size_t size);
 
-            void getInput(vec1<dtype> input);
+            void getInput(const vec1<dtype> input);
+    };
+
+    class Leaf2 : public Node
+    {
+        public :
+            Leaf2 (size_t height, size_t width);
+
+            void getInput(const vec1<dtype> input);
+            void getInput(const vec2<dtype> input);
     };
 
     class MMtoM : public Node
@@ -98,10 +109,20 @@ namespace CG
             virtual void calcPartialDerivative();
     };
 
-    class MLE : public MMto1
+    class MSE : public MMto1
     {
         public : 
-            MLE (Node *node1, Node *node2);
+            MSE (Node *node1, Node *node2);
+
+            virtual void calcData();
+
+            virtual void calcPartialDerivative();
+    };
+
+    class CEE : public MMto1
+    {
+        public : 
+            CEE (Node *node1, Node *node2);
 
             virtual void calcData();
 

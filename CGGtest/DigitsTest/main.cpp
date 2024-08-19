@@ -12,8 +12,10 @@ int main(void) {
     vec2<dtype> data = loadDigitsData("../../Data/Digits_data.csv");
     vec2<dtype> target = loadDigitsTarget("../../Data/Digits_target.csv");
 
-    //CGG::FNN* fnn = CGG::feedForwardReLU({64, 64, 64, 10}, "Softmax", "MLE");
-    CGG::FNN* fnn = CGG::parseFeedForward("temp.txt");
+    //CGG::FNN* fnn = CGG::feedForwardReLU({64, 64, 64, 10}, "Softmax", "CEE");
+    CGG::FNN* fnn = CGG::parseFeedForward("CEE.txt");
+    //CGG::FNN* fnn = CGG::feedForwardReLU({64, 64, 64, 10}, "Softmax", "MSE");
+    //CGG::FNN* fnn = CGG::parseFeedForward("MSE.txt");
     
 
     int r = 1;
@@ -40,12 +42,13 @@ int main(void) {
             }
         }
 
-        fnn->update(0.001);
+        fnn->update(0.000001);
         std::cout << std::setw(3) << std::setfill('0') << n << ": " << "train loss= " << std::setw(9) << std::fixed << std::setprecision(5) << loss << " accuracy = " << std::setw(7) << std::fixed << std::setprecision(5) << (double)score / (1798-DATA_SIZE) << std::endl;
 
         if (n%10==0) {
             CGC::Converter C;
-            C.convertAll(fnn->loss, "temp.txt");
+            C.convertAll(fnn->loss, "CEE.txt");
+            //C.convertAll(fnn->loss, "MSE.txt");
             std::cout << "--- This network was saved! ---" << std::endl;
         }
     }

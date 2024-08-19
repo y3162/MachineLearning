@@ -41,13 +41,13 @@ namespace CGP
         assert (token == "Node");
         *in >> token;
 
-        if (token == "Leaf") {
+        if (token == "Leaf1") {
             int size;
             *in >> token;
             assert (token == "data");
             *in >> size;
 
-            ret = new CG::Leaf(size);
+            ret = new CG::Leaf1(size);
             i2p[id] = ret;
             return ret;
         } else if (token == "Add") {
@@ -80,14 +80,24 @@ namespace CGP
             ret = new CG::Dots(i2p[id1], i2p[id2]);
             i2p[id] = ret;
             return ret;
-        } else if (token == "MLE") {
+        } else if (token == "MSE") {
             *in >> token;
             assert (token == "back");
             *in >> id1;
             *in >> id2;
             assert (i2p.find(id1) != i2p.end());
             assert (i2p.find(id2) != i2p.end());
-            ret = new CG::MLE(i2p[id1], i2p[id2]);
+            ret = new CG::MSE(i2p[id1], i2p[id2]);
+            i2p[id] = ret;
+            return ret;
+        } else if (token == "CEE") {
+            *in >> token;
+            assert (token == "back");
+            *in >> id1;
+            *in >> id2;
+            assert (i2p.find(id1) != i2p.end());
+            assert (i2p.find(id2) != i2p.end());
+            ret = new CG::CEE(i2p[id1], i2p[id2]);
             i2p[id] = ret;
             return ret;
         } else if (token == "ReLU") {

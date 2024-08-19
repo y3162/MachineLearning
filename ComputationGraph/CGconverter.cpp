@@ -47,9 +47,9 @@ namespace CGC
     {   
         assert (p2i.find(node) != p2i.end());
 
-        if (typeid(*node) == typeid(CG::Leaf)) {
+        if (typeid(*node) == typeid(CG::Leaf1)) {
             *out << "id " << p2i[node] << std::endl;
-            *out << "Node Leaf" << std::endl;
+            *out << "Node Leaf1" << std::endl;
             *out << "data " << node->data.size() << std::endl;
         } else if (typeid(*node) == typeid(CG::Add)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
@@ -81,7 +81,7 @@ namespace CGC
             *out << "id " << p2i[node] << std::endl;
             *out << "Node Dots" << std::endl;
             *out << "back " << p2i[node->backward.at(0)] << " " << p2i[node->backward.at(1)] << std::endl;
-        } else if (typeid(*node) == typeid(CG::MLE)) {
+        } else if (typeid(*node) == typeid(CG::MSE)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
                 convert(node->backward.at(0));
             }
@@ -89,7 +89,17 @@ namespace CGC
                 convert(node->backward.at(1));
             }
             *out << "id " << p2i[node] << std::endl;
-            *out << "Node MLE" << std::endl;
+            *out << "Node MSE" << std::endl;
+            *out << "back " << p2i[node->backward.at(0)] << " " << p2i[node->backward.at(1)] << std::endl;
+        } else if (typeid(*node) == typeid(CG::CEE)) {
+            if (p2i.find(node->backward.at(0)) == p2i.end()) {
+                convert(node->backward.at(0));
+            }
+            if (p2i.find(node->backward.at(1)) == p2i.end()) {
+                convert(node->backward.at(1));
+            }
+            *out << "id " << p2i[node] << std::endl;
+            *out << "Node CEE" << std::endl;
             *out << "back " << p2i[node->backward.at(0)] << " " << p2i[node->backward.at(1)] << std::endl;
         } else if (typeid(*node) == typeid(CG::ReLU)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
