@@ -56,6 +56,20 @@ namespace CG
             void getInput(const vec2<dtype> input);
     };
 
+    class Concatenation : public Node
+    {
+        public :
+            vec1<size_t> dataSize;
+
+            Concatenation (vec1<Node*> nodes);
+
+            int whichNode(size_t index);
+
+            virtual void calcData();
+
+            virtual void calcPartialDerivative();
+    };
+
     class MMtoM : public Node
     {
         public :

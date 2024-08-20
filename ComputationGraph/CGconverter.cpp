@@ -55,6 +55,22 @@ namespace CGC
             *out << "id " << p2i[node] << std::endl;
             *out << "Node Leaf2" << std::endl;
             *out << "data " << node->height << " " << node->width << std::endl;
+        } else if (typeid(*node) == typeid(CG::Concatenation)) {
+            for (int i=0; i<node->backward.size(); ++i) {
+                if (p2i.find(node->backward.at(i)) == p2i.end()) {
+                    convert(node->backward.at(i));
+                }
+            }
+            CG::Concatenation*conv = dynamic_cast<CG::Concatenation*>(node);
+            assert (conv != nullptr);
+            *out << "id " << p2i[conv] << std::endl;
+            *out << "Node Concatenation" << std::endl;
+            *out << "size " << node->backward.size() << std::endl;
+            *out << "back";
+            for (int i=0; i<node->backward.size(); ++i) {
+                *out << " " << p2i[node->backward.at(i)];
+            }
+            *out << std::endl;
         } else if (typeid(*node) == typeid(CG::Add)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
                 convert(node->backward.at(0));

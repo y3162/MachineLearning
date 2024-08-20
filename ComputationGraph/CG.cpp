@@ -123,6 +123,62 @@ namespace CG
 
 
 
+    Concatenation::Concatenation (vec1<Node*> nodes)
+    {
+        dataSize.resize(nodes.size());
+        domsize = 0;
+        height  = 0;
+        width   = 1;
+        for (int i=0; i<nodes.size(); ++i) {
+            assert (nodes.at(i)->width == 1);
+            dataSize.at(i) = domsize;
+            domsize += nodes.at(i)->data.size();
+            height  += nodes.at(i)->height;
+            assert (domsize == height);
+        }
+
+        data.resize(domsize);
+        grad.resize(domsize);
+
+        forward.resize(0);
+
+        backward.resize(nodes.size());
+        for (int i=0; i<nodes.size(); ++i) {
+            backward.at(i) = nodes.at(i);
+            pushThis(nodes.at(i));
+        }
+    }
+
+    int Concatenation::whichNode(size_t index)
+    {
+        for (int i=0; i<backward.size()-1; ++i) {
+            if (dataSize.at(i) <= index && index < dataSize.at(i+1)) {
+                return i;
+            }
+        }
+        return backward.size() - 1;
+    }
+
+    void Concatenation::calcData()
+    {
+        for (int i=0; i<domsize; ++i) {
+            int index = whichNode(i);
+            size_t remain = i - dataSize.at(index);
+            data.at(i) = backward.at(index)->data.at(remain);
+        }
+    }
+
+    void Concatenation::calcPartialDerivative()
+    {
+        for (int i=0; i<domsize; ++i) {
+            int index = whichNode(i);
+            size_t remain = i - dataSize.at(index);
+            backward.at(index)->grad.at(remain) = grad.at(i);
+        }
+    }
+
+
+
     MMtoM::MMtoM (Node *node1, Node *node2)
     {   
         assert (node1->data.size() == node2->data.size());
@@ -557,7 +613,7 @@ namespace CG
         gradBias = 0;
     }
 
-    
+
 
     void dumpNode (Node const node1, std::string name)
     {

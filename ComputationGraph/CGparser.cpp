@@ -59,6 +59,23 @@ namespace CGP
             ret = new CG::Leaf2(height, width);
             i2p[id] = ret;
             return ret;
+        } else if (token == "Concatenation") {
+            int size;
+            vec1<CG::Node*> nodes;
+            *in >> token;
+            assert (token == "size");
+            *in >> size;
+            *in >> token;
+            assert (token == "back");
+            nodes.resize(size);
+            for (int i=0; i<size; ++i) {
+                *in >> id1;
+                assert (i2p.find(id1) != i2p.end());
+                nodes.at(i) = i2p[id1];
+            }
+            ret = new CG::Concatenation(nodes);
+            i2p[id] = ret;
+            return ret;
         } else if (token == "Add") {
             *in >> token;
             assert (token == "back");
