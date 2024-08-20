@@ -50,6 +50,15 @@ namespace CGP
             ret = new CG::Leaf1(size);
             i2p[id] = ret;
             return ret;
+        } else if (token == "Leaf2") {
+            int height, width;
+            *in >> token;
+            assert (token == "data");
+            *in >> height >> width;
+
+            ret = new CG::Leaf2(height, width);
+            i2p[id] = ret;
+            return ret;
         } else if (token == "Add") {
             *in >> token;
             assert (token == "back");
@@ -137,7 +146,7 @@ namespace CGP
             assert (token == "bias");
             *in >> b;
             *in >> token;
-            assert (token == "Weight");
+            assert (token == "weight");
             *in >> M;
             *in >> N;
             w.resize(M+1);
@@ -148,6 +157,35 @@ namespace CGP
                 }
             }
             CG::Affine *ret1 = new CG::Affine(i2p[id1], w);
+            ret1->bias = b;
+            i2p[id] = ret1;
+            return ret1;
+        } else if (token == "Convolution") {
+            size_t p, H, W;
+            vec2<dtype> k;
+            dtype b;
+
+            *in >> token;
+            assert (token == "back");
+            *in >> id1;
+            assert (i2p.find(id1) != i2p.end());
+            *in >> token;
+            assert (token == "padding");
+            *in >> p;
+            *in >> token;
+            assert (token == "bias");
+            *in >> b;
+            *in >> token;
+            assert (token == "kernel");
+            *in >> H >> W;
+            k.resize(H);
+            for (int i=0; i<H; ++i) {
+                k.at(i).resize(W);
+                for (int j=0; j<W; ++j) {
+                    *in >> k.at(i).at(j);
+                }
+            }
+            CG::Convolution *ret1 = new CG::Convolution(i2p[id1], k, p);
             ret1->bias = b;
             i2p[id] = ret1;
             return ret1;

@@ -51,6 +51,10 @@ namespace CGC
             *out << "id " << p2i[node] << std::endl;
             *out << "Node Leaf1" << std::endl;
             *out << "data " << node->data.size() << std::endl;
+        } else if (typeid(*node) == typeid(CG::Leaf2)) {
+            *out << "id " << p2i[node] << std::endl;
+            *out << "Node Leaf2" << std::endl;
+            *out << "data " << node->height << " " << node->width << std::endl;
         } else if (typeid(*node) == typeid(CG::Add)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
                 convert(node->backward.at(0));
@@ -132,13 +136,34 @@ namespace CGC
             *out << "Node Affine" << std::endl;
             *out << "back " << p2i[aff->backward.at(0)] << std::endl;
             *out << "bias " << aff->bias << std::endl;
-            *out << "Weight " << aff->domsize << " " << aff->data.size() << std::endl;
-            for (int i=0; i<aff->Weight.size(); ++i) {
-                for (int j=0; j<aff->Weight.at(i).size(); ++j) {
+            *out << "weight " << aff->domsize << " " << aff->data.size() << std::endl;
+            for (int i=0; i<aff->weight.size(); ++i) {
+                for (int j=0; j<aff->weight.at(i).size(); ++j) {
                     if (j != 0) {
                         *out << " ";
                     }
-                    *out << aff->Weight.at(i).at(j);
+                    *out << aff->weight.at(i).at(j);
+                }
+                *out << std::endl;
+            }
+        } else if (typeid(*node) == typeid(CG::Convolution)) {
+            if (p2i.find(node->backward.at(0)) == p2i.end()) {
+                convert(node->backward.at(0));
+            }
+            CG::Convolution*conv = dynamic_cast<CG::Convolution*>(node);
+            assert (conv != nullptr);
+            *out << "id " << p2i[conv] << std::endl;
+            *out << "Node Convolution" << std::endl;
+            *out << "back " << p2i[conv->backward.at(0)] << std::endl;
+            *out << "padding " << conv->psize << std::endl;
+            *out << "bias " << conv->bias << std::endl;
+            *out << "kernel " << conv->kernel.size() << " " << conv->kernel.at(0).size() << std::endl;
+            for (int i=0; i<conv->kernel.size(); ++i) {
+                for (int j=0; j<conv->kernel.at(i).size(); ++j) {
+                    if (j != 0) {
+                        *out << " ";
+                    }
+                    *out << conv->kernel.at(i).at(j);
                 }
                 *out << std::endl;
             }

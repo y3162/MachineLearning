@@ -111,7 +111,9 @@ namespace CG
 
     void Leaf2::getInput(const vec2<dtype> input)
     {
-        assert (data.size() == input.size() * input.at(0).size());
+        assert (input.size() == height);
+        assert (input.at(0).size() == width);
+
         for (int i=0; i<height; ++i) {
             for (int j=0; j<width; ++j) {
                 data.at(i * width + j) = input.at(i).at(j);
@@ -387,13 +389,15 @@ namespace CG
         assert (node1->data.size() + 1 == W.size());
         assert (node1->width == 1);
         
-        Weight = W;
+        weight = W;
 
         domsize = node1->data.size();
         size_t osize = W.at(0).size();
-        gradWeight.resize(domsize+1);
+        height = osize;
+        width  = 1;
+        gradweight.resize(domsize+1);
         for (int i=0; i<=domsize; ++i) {
-            gradWeight.at(i).resize(osize);
+            gradweight.at(i).resize(osize);
         }
         data.resize(osize);
         grad.resize(osize);
@@ -411,9 +415,9 @@ namespace CG
         for (int i=0; i<data.size(); ++i) {
             data.at(i) = 0;
             for (int j=0; j<domsize; ++j) {
-                data.at(i) += Weight.at(j).at(i) * backward.at(0)->data.at(j);
+                data.at(i) += weight.at(j).at(i) * backward.at(0)->data.at(j);
             }
-            data.at(i) += Weight.at(domsize).at(i) * bias;
+            data.at(i) += weight.at(domsize).at(i) * bias;
         }
     }
 
@@ -421,17 +425,17 @@ namespace CG
     {
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<data.size(); ++j) {
-                backward.at(0)->grad.at(i) += Weight.at(i).at(j) * grad.at(j);
+                backward.at(0)->grad.at(i) += weight.at(i).at(j) * grad.at(j);
             }
         }
 
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<data.size(); ++j) {
-                gradWeight.at(i).at(j) += backward.at(0)->data.at(i) * grad.at(j);
+                gradweight.at(i).at(j) += backward.at(0)->data.at(i) * grad.at(j);
             }
         }
         for (int j=0; j<data.size(); ++j) {
-            gradWeight.at(domsize).at(j) += bias * grad.at(j);
+            gradweight.at(domsize).at(j) += bias * grad.at(j);
         }
     }
 
@@ -439,10 +443,118 @@ namespace CG
     {
         for (int i=0; i<=domsize; ++i) {
             for (int j=0; j<data.size(); ++j) {
-                Weight.at(i).at(j) -= eta * gradWeight.at(i).at(j);
-                gradWeight.at(i).at(j) = 0;
+                weight.at(i).at(j) -= eta * gradweight.at(i).at(j);
+                gradweight.at(i).at(j) = 0;
             }
         }
+    }
+
+
+
+    Convolution::Convolution (Node *node1, const vec2<dtype> K, const size_t padding)
+    {
+        assert (padding < K.size());
+        assert (padding < K.at(0).size());
+        
+        size_t kheight = K.size();
+        size_t kwidth  = K.at(0).size();
+        kernel = K;
+        gradKernel.resize(kheight);
+        for (int i=0; i<kheight; ++i) {
+            gradKernel.at(i).resize(kwidth);
+        }
+        domsize = node1->height * node1->width;
+        psize   = padding;
+        height  = node1->height + 2 * psize - kheight + 1;
+        width   = node1->width  + 2 * psize - kwidth  + 1;
+
+        data.resize(height * width);
+        grad.resize(height * width);
+
+        forward.resize(0);
+
+        backward.resize(1);
+        backward.at(0) = node1;
+
+        pushThis(node1);
+    }
+
+    dtype Convolution::getDomData(int col, int row)
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        if (0 <= col && col < bheight && 0 <= row && row < bwidth) {
+            return backward.at(0)->data.at(col * bwidth + row);
+        } else {
+            return 0;
+        }
+    }
+
+    void Convolution::calcData()
+    {    
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        size_t kheight = kernel.size();
+        size_t kwidth  = kernel.at(0).size();
+        for (int s=0; s<height; ++s) {
+            for (int t=0; t<width; ++t) {
+                int index = s * width + t;
+                data.at(index) = bias;
+                for (int i=0; i<kheight; ++i) {
+                    for (int j=0; j<kwidth; ++j) {
+                        data.at(index) += kernel.at(i).at(j) * getDomData(s + i - psize, t + j - psize);
+                    }
+                }
+            }
+        }
+    }
+
+    void Convolution::calcPartialDerivative()
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        size_t kheight = kernel.size();
+        size_t kwidth  = kernel.at(0).size();
+        for (int s=0; s<bheight; ++s) {
+            for (int t=0; t<bwidth; ++t) {
+                backward.at(0)->grad.at(s * bwidth + t) = 0;
+                for (int i=0; i<kheight; ++i) {
+                    for (int j=0; j<kwidth; ++j) {
+                        int col = s - i + psize;
+                        int row = t - j + psize;
+                        if (0 <= col && col < height && 0 <= row && row < width) {
+                            backward.at(0)->grad.at(s * bwidth + t) += kernel.at(i).at(j) * grad.at((s - i + psize) * width + (t - j + psize));
+                        }
+                    }
+                }
+            }
+        }
+        for (int i=0; i<kheight; ++i) {
+            for (int j=0; j<kwidth; ++j) {
+                for (int s=0; s<height; ++s) {
+                    for (int t=0; t<width; ++t) {
+                        gradKernel.at(i).at(j) += getDomData(s + i - psize, t + j - psize) * grad.at(s * width + t);
+                    }
+                }
+            }
+        }
+        for (int s=0; s<height; ++s) {
+            for (int t=0; t<width; ++t) {
+                gradBias += grad.at(s * width + t);
+            }
+        }
+    }
+
+    void Convolution::updateParameters(dtype eta)
+    {
+        for (int i=0; i<kernel.size(); ++i) {
+            for (int j=0; j<kernel.at(0).size(); ++j) {
+                kernel.at(i).at(j) -= eta * gradKernel.at(i).at(j);
+                gradKernel.at(i).at(j) = 0;
+            }
+        }
+        bias -= eta * gradBias;
+        gradBias = 0;
     }
 
     

@@ -19,12 +19,12 @@ namespace CGG
     class FNN
     {
         public :
-            CG::Leaf *input;
-            CG::Leaf *target;
-            CG::Node *output;
-            CG::Node *loss;
+            CG::Leaf1 *input;
+            CG::Leaf1 *target;
+            CG::Node  *output;
+            CG::Node  *loss;
 
-            FNN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss);
+            FNN (CG::Leaf1 *input, CG::Leaf1 *target, CG::Node *output, CG::Node *loss);
 
             vec1<dtype> expect(const vec1<dtype> expectData);
 

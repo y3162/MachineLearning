@@ -62,7 +62,7 @@ namespace CGG
 
 
 
-    FNN::FNN (CG::Leaf *input, CG::Leaf *target, CG::Node *output, CG::Node *loss)
+    FNN::FNN (CG::Leaf1 *input, CG::Leaf1 *target, CG::Node *output, CG::Node *loss)
     : input(input), target(target), output(output), loss(loss)
     {
         assert (loss->data.size() == 1);
@@ -113,8 +113,8 @@ namespace CGG
         CGP::Parser P;
         CG::Node *loss = P.parseAll(filename);
 
-        CG::Node *output = loss->backward.at(0);
-        CG::Leaf *target = dynamic_cast<CG::Leaf*>(loss->backward.at(1));
+        CG::Node  *output = loss->backward.at(0);
+        CG::Leaf1 *target = dynamic_cast<CG::Leaf1*>(loss->backward.at(1));
 
         CG::Node *temp = output;
         while (temp->backward.size() != 0) {
@@ -122,14 +122,14 @@ namespace CGG
             temp = temp->backward.at(0);
         }
 
-        CG::Leaf *input = dynamic_cast<CG::Leaf*>(temp);
+        CG::Leaf1 *input = dynamic_cast<CG::Leaf1*>(temp);
 
         return new FNN(input, target, output, loss);
     }
 
     FNN* feedForwardReLU(const vec1<size_t> nodes, std::string normlizationType, std::string lossType)
     {   
-        CG::Leaf* input  = new CG::Leaf(nodes.at(0));
+        CG::Leaf1* input = new CG::Leaf1(nodes.at(0));
         CG::Node* output = input;
 
         for (int i=0; i<nodes.size()-1; ++i) 
@@ -140,7 +140,7 @@ namespace CGG
         
         output = setNormalizationFunction(output, normlizationType);
 
-        CG::Leaf* target = new CG::Leaf(nodes.at(nodes.size() - 1));
+        CG::Leaf1* target = new CG::Leaf1(nodes.at(nodes.size() - 1));
 
         CG::Node* loss = setLossFunction(output, target, lossType);
 

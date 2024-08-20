@@ -162,11 +162,31 @@ namespace CG
     class Affine : public Node
     {
         public :
-            vec2<dtype> Weight;
-            vec2<dtype> gradWeight;
+            vec2<dtype> weight;
+            vec2<dtype> gradweight;
             dtype       bias = 1;
 
             Affine (Node *node1, const vec2<dtype> W);
+
+            virtual void calcData();
+
+            virtual void calcPartialDerivative();
+
+            virtual void updateParameters(dtype eta);
+    };
+
+    class Convolution : public Node
+    {
+        public :
+            vec2<dtype> kernel;
+            vec2<dtype> gradKernel;
+            dtype       bias = 0;
+            dtype       gradBias;
+            size_t      psize;
+
+            Convolution (Node *node1, const vec2<dtype> K, const size_t padding);
+
+            dtype getDomData(int col, int row);
 
             virtual void calcData();
 
