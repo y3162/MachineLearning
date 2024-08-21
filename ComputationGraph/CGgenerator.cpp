@@ -135,7 +135,7 @@ namespace CGG
         for (int i=0; i<nodes.size()-1; ++i) 
         {
             output = new CG::ReLU(output);
-            output = new CG::Affine(output, initWeight("He", nodes.at(i), nodes.at(i + 1)));
+            output = new CG::Affine(output, initWeight("He", nodes.at(i), nodes.at(i + 1)), 1);
         }
         
         output = setNormalizationFunction(output, normlizationType);

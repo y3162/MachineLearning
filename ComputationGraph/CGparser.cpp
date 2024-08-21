@@ -55,7 +55,6 @@ namespace CGP
             *in >> token;
             assert (token == "data");
             *in >> height >> width;
-
             ret = new CG::Leaf2(height, width);
             i2p[id] = ret;
             return ret;
@@ -173,37 +172,42 @@ namespace CGP
                     *in >> w.at(i).at(j);
                 }
             }
-            CG::Affine *ret1 = new CG::Affine(i2p[id1], w);
-            ret1->bias = b;
+            CG::Affine *ret1 = new CG::Affine(i2p[id1], w, b);
             i2p[id] = ret1;
             return ret1;
         } else if (token == "Convolution") {
-            size_t p, H, W;
+            size_t h, w;
+            size_t s, pt, pl, kh, kw;
             vec2<dtype> k;
             dtype b;
 
+            *in >> token;
+            assert (token == "data");
+            *in >> h >> w;
             *in >> token;
             assert (token == "back");
             *in >> id1;
             assert (i2p.find(id1) != i2p.end());
             *in >> token;
+            assert (token == "stride");
+            *in >> s;
+            *in >> token;
             assert (token == "padding");
-            *in >> p;
+            *in >> pt >> pl;
             *in >> token;
             assert (token == "bias");
             *in >> b;
             *in >> token;
             assert (token == "kernel");
-            *in >> H >> W;
-            k.resize(H);
-            for (int i=0; i<H; ++i) {
-                k.at(i).resize(W);
-                for (int j=0; j<W; ++j) {
+            *in >> kh >> kw;
+            k.resize(kh);
+            for (int i=0; i<kh; ++i) {
+                k.at(i).resize(kw);
+                for (int j=0; j<kw; ++j) {
                     *in >> k.at(i).at(j);
                 }
             }
-            CG::Convolution *ret1 = new CG::Convolution(i2p[id1], k, p);
-            ret1->bias = b;
+            CG::Convolution *ret1 = new CG::Convolution(i2p[id1], k, b, s, pt, pl, h, w);
             i2p[id] = ret1;
             return ret1;
         } else {

@@ -170,8 +170,10 @@ namespace CGC
             assert (conv != nullptr);
             *out << "id " << p2i[conv] << std::endl;
             *out << "Node Convolution" << std::endl;
+            *out << "data " << conv->height << " " << conv->width << std::endl;
             *out << "back " << p2i[conv->backward.at(0)] << std::endl;
-            *out << "padding " << conv->psize << std::endl;
+            *out << "stride " << conv->sw << std::endl;
+            *out << "padding " << conv->pt << " " << conv->pt << std::endl;
             *out << "bias " << conv->bias << std::endl;
             *out << "kernel " << conv->kernel.size() << " " << conv->kernel.at(0).size() << std::endl;
             for (int i=0; i<conv->kernel.size(); ++i) {

@@ -112,9 +112,9 @@ namespace CG
     void Leaf2::getInput(const vec2<dtype> input)
     {
         assert (input.size() == height);
-        assert (input.at(0).size() == width);
 
         for (int i=0; i<height; ++i) {
+            assert (input.at(i).size() == width);
             for (int j=0; j<width; ++j) {
                 data.at(i * width + j) = input.at(i).at(j);
             }
@@ -187,7 +187,7 @@ namespace CG
 
         domsize = node1->data.size();
         height = node1->height;
-        width  = node2->width;
+        width  = node1->width;
         data.resize(domsize);
         grad.resize(domsize);
 
@@ -440,7 +440,8 @@ namespace CG
 
     
     
-    Affine::Affine (Node *node1, const vec2<dtype> W)
+    Affine::Affine (Node *node1, const vec2<dtype> W, dtype b)
+    : bias(b)
     {
         assert (node1->data.size() + 1 == W.size());
         assert (node1->width == 1);
@@ -465,6 +466,9 @@ namespace CG
 
         pushThis(node1);
     }
+
+    Affine::Affine (Node *node1, const vec2<dtype> W)
+    : Affine (node1, W, 1){}
 
     void Affine::calcData()
     {
@@ -507,22 +511,25 @@ namespace CG
 
 
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> K, const size_t padding)
+    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
     {
-        assert (padding < K.size());
-        assert (padding < K.at(0).size());
-        
+        assert (K.size() <= node1->height);
+        assert (K.at(0).size() <= node1->width);
+
         size_t kheight = K.size();
         size_t kwidth  = K.at(0).size();
         kernel = K;
+        bias   = b;
         gradKernel.resize(kheight);
         for (int i=0; i<kheight; ++i) {
             gradKernel.at(i).resize(kwidth);
         }
         domsize = node1->height * node1->width;
-        psize   = padding;
-        height  = node1->height + 2 * psize - kheight + 1;
-        width   = node1->width  + 2 * psize - kwidth  + 1;
+        pt = topPadding;
+        pl = leftPadding;
+        sw = stride;
+        this->height  = height;
+        this->width   = width;
 
         data.resize(height * width);
         grad.resize(height * width);
@@ -533,6 +540,26 @@ namespace CG
         backward.at(0) = node1;
 
         pushThis(node1);
+    }
+
+    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t height, size_t width)
+    : Convolution (node1, K, b, stride, (stride*(height-1) + K.size() - node1->height)/2, (stride*(width-1) + K.at(0).size() - node1->width)/2, height, width)
+    {
+        assert (stride * (height - 1) + K.size()       >= node1->height);
+        assert (stride * (width  - 1) + K.at(0).size() >= node1->width);
+    }
+
+    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride)
+    : Convolution (node1, K, b, stride, (node1->height - K.size() + (stride-1))/stride + 1, (node1->width - K.at(0).size() + (stride-1))/stride + 1){}
+
+    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t height, size_t width)
+    : Convolution (node1, K, b, 1, height, width){}
+
+    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b)
+    : Convolution (node1, K, b, 1, node1->height - (K.size()-1), node1->width - (K.at(0).size()-1))
+    {
+        assert (K.size() <= node1->height);
+        assert (K.at(0).size() <= node1->width);
     }
 
     dtype Convolution::getDomData(int col, int row)
@@ -552,13 +579,13 @@ namespace CG
         size_t bwidth  = backward.at(0)->width;
         size_t kheight = kernel.size();
         size_t kwidth  = kernel.at(0).size();
-        for (int s=0; s<height; ++s) {
-            for (int t=0; t<width; ++t) {
-                int index = s * width + t;
+        for (int a=0; a<height; ++a) {
+            for (int b=0; b<width; ++b) {
+                int index = a * width + b;
                 data.at(index) = bias;
                 for (int i=0; i<kheight; ++i) {
                     for (int j=0; j<kwidth; ++j) {
-                        data.at(index) += kernel.at(i).at(j) * getDomData(s + i - psize, t + j - psize);
+                        data.at(index) += kernel.at(i).at(j) * getDomData(a * sw + i - pt, b * sw + j - pl);
                     }
                 }
             }
@@ -571,15 +598,15 @@ namespace CG
         size_t bwidth  = backward.at(0)->width;
         size_t kheight = kernel.size();
         size_t kwidth  = kernel.at(0).size();
-        for (int s=0; s<bheight; ++s) {
-            for (int t=0; t<bwidth; ++t) {
-                backward.at(0)->grad.at(s * bwidth + t) = 0;
-                for (int i=0; i<kheight; ++i) {
-                    for (int j=0; j<kwidth; ++j) {
-                        int col = s - i + psize;
-                        int row = t - j + psize;
+        for (int a=0; a<bheight; ++a) {
+            for (int b=0; b<bwidth; ++b) {
+                backward.at(0)->grad.at(a * bwidth + b) = 0;
+                for (int i=(a+pt)%sw; i<kheight; i+=sw) {
+                    for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
+                        int col = (a - i + pt) / sw;
+                        int row = (b - j + pl) / sw;
                         if (0 <= col && col < height && 0 <= row && row < width) {
-                            backward.at(0)->grad.at(s * bwidth + t) += kernel.at(i).at(j) * grad.at((s - i + psize) * width + (t - j + psize));
+                            backward.at(0)->grad.at(a * bwidth + b) += kernel.at(i).at(j) * grad.at(col * width + row);
                         }
                     }
                 }
@@ -587,16 +614,16 @@ namespace CG
         }
         for (int i=0; i<kheight; ++i) {
             for (int j=0; j<kwidth; ++j) {
-                for (int s=0; s<height; ++s) {
-                    for (int t=0; t<width; ++t) {
-                        gradKernel.at(i).at(j) += getDomData(s + i - psize, t + j - psize) * grad.at(s * width + t);
+                for (int a=0; a<height; ++a) {
+                    for (int b=0; b<width; ++b) {
+                        gradKernel.at(i).at(j) += getDomData(a * sw + i - pt, b * sw + j - pl) * grad.at(a * width + b);
                     }
                 }
             }
         }
-        for (int s=0; s<height; ++s) {
-            for (int t=0; t<width; ++t) {
-                gradBias += grad.at(s * width + t);
+        for (int a=0; a<height; ++a) {
+            for (int b=0; b<width; ++b) {
+                gradBias += grad.at(a * width + b);
             }
         }
     }

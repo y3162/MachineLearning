@@ -15,13 +15,13 @@ namespace CG
     class Node
     {
         public :
+            size_t      domsize;
+            size_t      height;
+            size_t      width;
             vec1<dtype> data;
             vec1<dtype> grad;
             vec1<Node*> forward;
             vec1<Node*> backward;
-            size_t      domsize;
-            size_t      height;
-            size_t      width;
             int         f_count = 0;
             int         b_count = 0;
 
@@ -178,8 +178,9 @@ namespace CG
         public :
             vec2<dtype> weight;
             vec2<dtype> gradweight;
-            dtype       bias = 1;
-
+            const dtype       bias;
+            
+            Affine (Node *node1, const vec2<dtype> W, dtype b);
             Affine (Node *node1, const vec2<dtype> W);
 
             virtual void calcData();
@@ -194,11 +195,16 @@ namespace CG
         public :
             vec2<dtype> kernel;
             vec2<dtype> gradKernel;
-            dtype       bias = 0;
+            dtype       bias;
             dtype       gradBias;
-            size_t      psize;
+            size_t      pl, pt;
+            size_t      sw;
 
-            Convolution (Node *node1, const vec2<dtype> K, const size_t padding);
+            Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+            Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t height, size_t width);
+            Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride);
+            Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t height, size_t width);
+            Convolution (Node *node1, const vec2<dtype> K, dtype b);
 
             dtype getDomData(int col, int row);
 
