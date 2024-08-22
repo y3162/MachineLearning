@@ -263,6 +263,43 @@ namespace CG
 
 
 
+    Filter::Filter (Node *node1, size_t fHeight, size_t fWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    {
+        assert (fHeight <= node1->height);
+        assert (fWidth <= node1->width);
+        assert (node1->height * node1->width == node1->data.size());
+
+        domsize = node1->data.size();
+        pt = topPadding;
+        pl = leftPadding;
+        sw = stride;
+        this->height  = height;
+        this->width   = width;
+
+        data.resize(height * width);
+        grad.resize(height * width);
+
+        forward.resize(0);
+
+        backward.resize(1);
+        backward.at(0) = node1;
+
+        pushThis(node1);
+    }
+
+    dtype Filter::getDomData(int col, int row)
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        if (0 <= col && col < bheight && 0 <= row && row < bwidth) {
+            return backward.at(0)->data.at(col * bwidth + row);
+        } else {
+            return 0;
+        }
+    }
+
+
+
     Add::Add (Node *node1, Node *node2) : MMtoM (node1, node2){};
 
     void Add::calcData()
@@ -512,10 +549,8 @@ namespace CG
 
 
     Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    : Filter (node1, K.size(), K.at(0).size(), stride, topPadding, leftPadding, height, width)
     {
-        assert (K.size() <= node1->height);
-        assert (K.at(0).size() <= node1->width);
-
         size_t kheight = K.size();
         size_t kwidth  = K.at(0).size();
         kernel = K;
@@ -524,22 +559,6 @@ namespace CG
         for (int i=0; i<kheight; ++i) {
             gradKernel.at(i).resize(kwidth);
         }
-        domsize = node1->height * node1->width;
-        pt = topPadding;
-        pl = leftPadding;
-        sw = stride;
-        this->height  = height;
-        this->width   = width;
-
-        data.resize(height * width);
-        grad.resize(height * width);
-
-        forward.resize(0);
-
-        backward.resize(1);
-        backward.at(0) = node1;
-
-        pushThis(node1);
     }
 
     Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t height, size_t width)
@@ -560,17 +579,6 @@ namespace CG
     {
         assert (K.size() <= node1->height);
         assert (K.at(0).size() <= node1->width);
-    }
-
-    dtype Convolution::getDomData(int col, int row)
-    {
-        size_t bheight = backward.at(0)->height;
-        size_t bwidth  = backward.at(0)->width;
-        if (0 <= col && col < bheight && 0 <= row && row < bwidth) {
-            return backward.at(0)->data.at(col * bwidth + row);
-        } else {
-            return 0;
-        }
     }
 
     void Convolution::calcData()

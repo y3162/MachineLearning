@@ -146,4 +146,3 @@ namespace CGG
 
         return new FNN(input, target, output, loss);
     }
-}

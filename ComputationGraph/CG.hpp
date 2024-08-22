@@ -94,6 +94,17 @@ namespace CG
             Mto1 (Node *node1);
     };
 
+    class Filter : public Node
+    {
+        public :
+            size_t pl, pt;
+            size_t sw;
+
+            Filter (Node *node1, size_t fHeight, size_t fWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+
+            dtype getDomData(int col, int row);
+    };
+
     class Add : public MMtoM
     {   
         public :
@@ -190,23 +201,19 @@ namespace CG
             virtual void updateParameters(dtype eta);
     };
 
-    class Convolution : public Node
+    class Convolution : public Filter
     {
         public :
             vec2<dtype> kernel;
             vec2<dtype> gradKernel;
             dtype       bias;
             dtype       gradBias;
-            size_t      pl, pt;
-            size_t      sw;
 
             Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
             Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t height, size_t width);
             Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride);
             Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t height, size_t width);
             Convolution (Node *node1, const vec2<dtype> K, dtype b);
-
-            dtype getDomData(int col, int row);
 
             virtual void calcData();
 
