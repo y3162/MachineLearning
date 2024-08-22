@@ -263,13 +263,15 @@ namespace CG
 
 
 
-    Filter::Filter (Node *node1, size_t fHeight, size_t fWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    Filter::Filter (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
     {
-        assert (fHeight <= node1->height);
-        assert (fWidth <= node1->width);
+        assert (kernelHeight <= node1->height);
+        assert (kernelWidth <= node1->width);
         assert (node1->height * node1->width == node1->data.size());
 
         domsize = node1->data.size();
+        kheight = kernelHeight;
+        kwidth  = kernelWidth;
         pt = topPadding;
         pl = leftPadding;
         sw = stride;
@@ -287,11 +289,21 @@ namespace CG
         pushThis(node1);
     }
 
-    dtype Filter::getDomData(int col, int row)
+    bool Filter::inDomain(int col, int row)
     {
         size_t bheight = backward.at(0)->height;
         size_t bwidth  = backward.at(0)->width;
         if (0 <= col && col < bheight && 0 <= row && row < bwidth) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    dtype Filter::getDomData(int col, int row)
+    {
+        size_t bwidth  = backward.at(0)->width;
+        if (inDomain(col, row)) {
             return backward.at(0)->data.at(col * bwidth + row);
         } else {
             return 0;
@@ -477,21 +489,21 @@ namespace CG
 
     
     
-    Affine::Affine (Node *node1, const vec2<dtype> W, dtype b)
-    : bias(b)
+    Affine::Affine (Node *node1, const vec2<dtype> Weight, dtype bias)
+    : bias(bias)
     {
-        assert (node1->data.size() + 1 == W.size());
+        assert (node1->data.size() + 1 == Weight.size());
         assert (node1->width == 1);
         
-        weight = W;
+        weight = Weight;
 
         domsize = node1->data.size();
-        size_t osize = W.at(0).size();
+        size_t osize = Weight.at(0).size();
         height = osize;
         width  = 1;
-        gradweight.resize(domsize+1);
+        gradWeight.resize(domsize+1);
         for (int i=0; i<=domsize; ++i) {
-            gradweight.at(i).resize(osize);
+            gradWeight.at(i).resize(osize);
         }
         data.resize(osize);
         grad.resize(osize);
@@ -504,8 +516,8 @@ namespace CG
         pushThis(node1);
     }
 
-    Affine::Affine (Node *node1, const vec2<dtype> W)
-    : Affine (node1, W, 1){}
+    Affine::Affine (Node *node1, const vec2<dtype> Weight)
+    : Affine (node1, Weight, 1){}
 
     void Affine::calcData()
     {
@@ -528,11 +540,11 @@ namespace CG
 
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<data.size(); ++j) {
-                gradweight.at(i).at(j) += backward.at(0)->data.at(i) * grad.at(j);
+                gradWeight.at(i).at(j) += backward.at(0)->data.at(i) * grad.at(j);
             }
         }
         for (int j=0; j<data.size(); ++j) {
-            gradweight.at(domsize).at(j) += bias * grad.at(j);
+            gradWeight.at(domsize).at(j) += bias * grad.at(j);
         }
     }
 
@@ -540,53 +552,49 @@ namespace CG
     {
         for (int i=0; i<=domsize; ++i) {
             for (int j=0; j<data.size(); ++j) {
-                weight.at(i).at(j) -= eta * gradweight.at(i).at(j);
-                gradweight.at(i).at(j) = 0;
+                weight.at(i).at(j) -= eta * gradWeight.at(i).at(j);
+                gradWeight.at(i).at(j) = 0;
             }
         }
     }
 
 
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
-    : Filter (node1, K.size(), K.at(0).size(), stride, topPadding, leftPadding, height, width)
+    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    : Filter (node1, Kernel.size(), Kernel.at(0).size(), stride, topPadding, leftPadding, height, width)
     {
-        size_t kheight = K.size();
-        size_t kwidth  = K.at(0).size();
-        kernel = K;
-        bias   = b;
+        kernel = Kernel;
+        bias   = bias;
         gradKernel.resize(kheight);
         for (int i=0; i<kheight; ++i) {
             gradKernel.at(i).resize(kwidth);
         }
     }
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride, size_t height, size_t width)
-    : Convolution (node1, K, b, stride, (stride*(height-1) + K.size() - node1->height)/2, (stride*(width-1) + K.at(0).size() - node1->width)/2, height, width)
+    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width)
+    : Convolution (node1, Kernel, bias, stride, (stride*(height-1) + Kernel.size() - node1->height)/2, (stride*(width-1) + Kernel.at(0).size() - node1->width)/2, height, width)
     {
-        assert (stride * (height - 1) + K.size()       >= node1->height);
-        assert (stride * (width  - 1) + K.at(0).size() >= node1->width);
+        assert (stride * (height - 1) + Kernel.size()       >= node1->height);
+        assert (stride * (width  - 1) + Kernel.at(0).size() >= node1->width);
     }
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t stride)
-    : Convolution (node1, K, b, stride, (node1->height - K.size() + (stride-1))/stride + 1, (node1->width - K.at(0).size() + (stride-1))/stride + 1){}
+    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride)
+    : Convolution (node1, Kernel, bias, stride, (node1->height - Kernel.size() + (stride-1))/stride + 1, (node1->width - Kernel.at(0).size() + (stride-1))/stride + 1){}
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b, size_t height, size_t width)
-    : Convolution (node1, K, b, 1, height, width){}
+    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t height, size_t width)
+    : Convolution (node1, Kernel, bias, 1, height, width){}
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> K, dtype b)
-    : Convolution (node1, K, b, 1, node1->height - (K.size()-1), node1->width - (K.at(0).size()-1))
+    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias)
+    : Convolution (node1, Kernel, bias, 1, node1->height - (Kernel.size()-1), node1->width - (Kernel.at(0).size()-1))
     {
-        assert (K.size() <= node1->height);
-        assert (K.at(0).size() <= node1->width);
+        assert (Kernel.size() <= node1->height);
+        assert (Kernel.at(0).size() <= node1->width);
     }
 
     void Convolution::calcData()
     {    
         size_t bheight = backward.at(0)->height;
         size_t bwidth  = backward.at(0)->width;
-        size_t kheight = kernel.size();
-        size_t kwidth  = kernel.at(0).size();
         for (int a=0; a<height; ++a) {
             for (int b=0; b<width; ++b) {
                 int index = a * width + b;
@@ -604,11 +612,9 @@ namespace CG
     {
         size_t bheight = backward.at(0)->height;
         size_t bwidth  = backward.at(0)->width;
-        size_t kheight = kernel.size();
-        size_t kwidth  = kernel.at(0).size();
         for (int a=0; a<bheight; ++a) {
             for (int b=0; b<bwidth; ++b) {
-                backward.at(0)->grad.at(a * bwidth + b) = 0;
+                //backward.at(0)->grad.at(a * bwidth + b) = 0;
                 for (int i=(a+pt)%sw; i<kheight; i+=sw) {
                     for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
                         int col = (a - i + pt) / sw;
@@ -638,14 +644,83 @@ namespace CG
 
     void Convolution::updateParameters(dtype eta)
     {
-        for (int i=0; i<kernel.size(); ++i) {
-            for (int j=0; j<kernel.at(0).size(); ++j) {
+        for (int i=0; i<kheight; ++i) {
+            for (int j=0; j<kwidth; ++j) {
                 kernel.at(i).at(j) -= eta * gradKernel.at(i).at(j);
                 gradKernel.at(i).at(j) = 0;
             }
         }
         bias -= eta * gradBias;
         gradBias = 0;
+    }
+
+
+
+    MaxPooling::MaxPooling (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    : Filter (node1, kernelHeight, kernelWidth, stride, topPadding, leftPadding, height, width)
+    {   
+        int bottomPadding = stride * (height - 1) + kernelHeight - node1->height - topPadding;
+        int rightPadding  = stride * (width  - 1) * kernelWidth  - node1->width  - leftPadding;
+        assert (topPadding  < kernelHeight && bottomPadding < kernelHeight);
+        assert (leftPadding < kernelWidth  && rightPadding  < kernelWidth);
+
+        maxCount.resize(this->height * this->width);
+    }
+
+    MaxPooling::MaxPooling (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t height, size_t width)
+    : MaxPooling (node1, kernelHeight, kernelWidth, stride, (stride*(height-1) + kernelHeight - node1->height)/2, (stride*(width-1) + kernelWidth - node1->width)/2, height, width){}
+
+    MaxPooling::MaxPooling (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride)
+    : MaxPooling (node1, kernelHeight, kernelWidth, stride, (node1->height - kernelHeight + (stride-1))/stride + 1, (node1->width - kernelWidth + (stride-1))/stride + 1){}
+
+    void MaxPooling::calcData()
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        for (int a=0; a<height; ++a) {
+            for (int b=0; b<width; ++b) {
+                int count = 0;
+                dtype max = NAN;
+                for (int i=0; i<kheight; ++i) {
+                    for (int j=0; j<kwidth; ++j) {
+                        if (!inDomain(a * sw + i - pt, b * sw + j - pl)) {
+                            continue;
+                        }
+                        dtype d = getDomData(a * sw + i - pt, b * sw + j - pl);
+                        if (max == NAN || max < d) {
+                            max = d;
+                            count = 1;
+                        } else if (max == d) {
+                            ++count;
+                        }
+                    }
+                }
+                assert (max != NAN);
+                data.at(a * width + b) = max;
+                maxCount.at(a * width + b) = count;
+            }
+        }
+    }
+
+    void MaxPooling::calcPartialDerivative()
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        for (int a=0; a<bheight; ++a) {
+            for (int b=0; b<bwidth; ++b) {
+                //backward.at(0)->grad.at(a * bwidth + b) = 0;
+                for (int i=(a+pt)%sw; i<kheight; i+=sw) {
+                    for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
+                        int col = (a - i + pt) / sw;
+                        int row = (b - j + pl) / sw;
+                        if (   0 <= col && col < height && 0 <= row && row < width
+                            && (backward.at(0)->data.at(a * bwidth +b) == getDomData(col, row))) {
+                            backward.at(0)->grad.at(a * bwidth + b) += grad.at(col * width + row) / maxCount.at(a * width + b);
+                        }
+                    }
+                }
+            }
+        }
     }
 
 
