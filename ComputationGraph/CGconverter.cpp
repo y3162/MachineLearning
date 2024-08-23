@@ -162,20 +162,20 @@ namespace CGC
                 }
                 *out << std::endl;
             }
-        } else if (typeid(*node) == typeid(CG::Convolution)) {
+        } else if (typeid(*node) == typeid(CG::Convolution2d)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
                 convert(node->backward.at(0));
             }
-            CG::Convolution*conv = dynamic_cast<CG::Convolution*>(node);
+            CG::Convolution2d*conv = dynamic_cast<CG::Convolution2d*>(node);
             assert (conv != nullptr);
             *out << "id " << p2i[conv] << std::endl;
-            *out << "Node Convolution" << std::endl;
+            *out << "Node Convolution2d" << std::endl;
             *out << "data " << conv->height << " " << conv->width << std::endl;
             *out << "back " << p2i[conv->backward.at(0)] << std::endl;
             *out << "stride " << conv->sw << std::endl;
             *out << "padding " << conv->pt << " " << conv->pt << std::endl;
             *out << "bias " << conv->bias << std::endl;
-            *out << "kernel " << conv->kernel.size() << " " << conv->kernel.at(0).size() << std::endl;
+            *out << "kernel " << conv->kheight << " " << conv->kwidth << std::endl;
             for (int i=0; i<conv->kernel.size(); ++i) {
                 for (int j=0; j<conv->kernel.at(i).size(); ++j) {
                     if (j != 0) {
@@ -185,6 +185,19 @@ namespace CGC
                 }
                 *out << std::endl;
             }
+        } else if (typeid(*node) == typeid(CG::MaxPooling)) {
+            if (p2i.find(node->backward.at(0)) == p2i.end()) {
+                convert(node->backward.at(0));
+            }
+            CG::MaxPooling *maxp = dynamic_cast<CG::MaxPooling*>(node);
+            assert (maxp != nullptr);
+            *out << "id " << p2i[maxp] << std::endl;
+            *out << "Node MaxPooling" << std::endl;
+            *out << "data " << maxp->height << " " << maxp->width << std::endl;
+            *out << "back " << p2i[maxp->backward.at(0)] << std::endl;
+            *out << "stride " << maxp->sw << std::endl;
+            *out << "padding " << maxp->pt << " " << maxp->pt << std::endl;
+            *out << "filter " << maxp->kheight << " " << maxp->kwidth << std::endl;
         } else {
             assert (false);
         }

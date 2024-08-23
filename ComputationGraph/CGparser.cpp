@@ -175,7 +175,7 @@ namespace CGP
             CG::Affine *ret1 = new CG::Affine(i2p[id1], w, b);
             i2p[id] = ret1;
             return ret1;
-        } else if (token == "Convolution") {
+        } else if (token == "Convolution2d") {
             size_t h, w;
             size_t s, pt, pl, kh, kw;
             vec2<dtype> k;
@@ -207,7 +207,30 @@ namespace CGP
                     *in >> k.at(i).at(j);
                 }
             }
-            CG::Convolution *ret1 = new CG::Convolution(i2p[id1], k, b, s, pt, pl, h, w);
+            CG::Convolution2d *ret1 = new CG::Convolution2d(i2p[id1], k, b, s, pt, pl, h, w);
+            i2p[id] = ret1;
+            return ret1;
+        } else if (token == "MaxPooling") {
+            size_t h, w;
+            size_t s, pt, pl, kh, kw;
+
+            *in >> token;
+            assert (token == "data");
+            *in >> h >> w;
+            *in >> token;
+            assert (token == "back");
+            *in >> id1;
+            assert (i2p.find(id1) != i2p.end());
+            *in >> token;
+            assert (token == "stride");
+            *in >> s;
+            *in >> token;
+            assert (token == "padding");
+            *in >> pt >> pl;
+            *in >> token;
+            assert (token == "filter");
+            *in >> kh >> kw;
+            CG::MaxPooling *ret1 = new CG::MaxPooling(i2p[id1], kh, kw, s, h, w);
             i2p[id] = ret1;
             return ret1;
         } else {

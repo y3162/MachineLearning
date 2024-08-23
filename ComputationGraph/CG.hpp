@@ -97,6 +97,7 @@ namespace CG
     class Filter : public Node
     {
         public :
+            size_t channnel;
             size_t kheight;
             size_t kwidth;
             size_t pl;
@@ -207,7 +208,7 @@ namespace CG
             virtual void updateParameters(dtype eta);
     };
 
-    class Convolution : public Filter
+    class Convolution2d : public Filter
     {
         public :
             vec2<dtype> kernel;
@@ -215,11 +216,11 @@ namespace CG
             dtype       bias;
             dtype       gradBias;
 
-            Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
-            Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width);
-            Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride);
-            Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t height, size_t width);
-            Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias);
+            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width);
+            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride);
+            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t height, size_t width);
+            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias);
 
             virtual void calcData();
 

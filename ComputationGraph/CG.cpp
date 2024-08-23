@@ -560,7 +560,7 @@ namespace CG
 
 
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    Convolution2d::Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
     : Filter (node1, Kernel.size(), Kernel.at(0).size(), stride, topPadding, leftPadding, height, width)
     {
         kernel = Kernel;
@@ -571,27 +571,27 @@ namespace CG
         }
     }
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width)
-    : Convolution (node1, Kernel, bias, stride, (stride*(height-1) + Kernel.size() - node1->height)/2, (stride*(width-1) + Kernel.at(0).size() - node1->width)/2, height, width)
+    Convolution2d::Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width)
+    : Convolution2d (node1, Kernel, bias, stride, (stride*(height-1) + Kernel.size() - node1->height)/2, (stride*(width-1) + Kernel.at(0).size() - node1->width)/2, height, width)
     {
         assert (stride * (height - 1) + Kernel.size()       >= node1->height);
         assert (stride * (width  - 1) + Kernel.at(0).size() >= node1->width);
     }
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride)
-    : Convolution (node1, Kernel, bias, stride, (node1->height - Kernel.size() + (stride-1))/stride + 1, (node1->width - Kernel.at(0).size() + (stride-1))/stride + 1){}
+    Convolution2d::Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride)
+    : Convolution2d (node1, Kernel, bias, stride, (node1->height - Kernel.size() + (stride-1))/stride + 1, (node1->width - Kernel.at(0).size() + (stride-1))/stride + 1){}
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t height, size_t width)
-    : Convolution (node1, Kernel, bias, 1, height, width){}
+    Convolution2d::Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t height, size_t width)
+    : Convolution2d (node1, Kernel, bias, 1, height, width){}
 
-    Convolution::Convolution (Node *node1, const vec2<dtype> Kernel, dtype bias)
-    : Convolution (node1, Kernel, bias, 1, node1->height - (Kernel.size()-1), node1->width - (Kernel.at(0).size()-1))
+    Convolution2d::Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias)
+    : Convolution2d (node1, Kernel, bias, 1, node1->height - (Kernel.size()-1), node1->width - (Kernel.at(0).size()-1))
     {
         assert (Kernel.size() <= node1->height);
         assert (Kernel.at(0).size() <= node1->width);
     }
 
-    void Convolution::calcData()
+    void Convolution2d::calcData()
     {    
         size_t bheight = backward.at(0)->height;
         size_t bwidth  = backward.at(0)->width;
@@ -608,7 +608,7 @@ namespace CG
         }
     }
 
-    void Convolution::calcPartialDerivative()
+    void Convolution2d::calcPartialDerivative()
     {
         size_t bheight = backward.at(0)->height;
         size_t bwidth  = backward.at(0)->width;
@@ -642,7 +642,7 @@ namespace CG
         }
     }
 
-    void Convolution::updateParameters(dtype eta)
+    void Convolution2d::updateParameters(dtype eta)
     {
         for (int i=0; i<kheight; ++i) {
             for (int j=0; j<kwidth; ++j) {
@@ -660,7 +660,7 @@ namespace CG
     : Filter (node1, kernelHeight, kernelWidth, stride, topPadding, leftPadding, height, width)
     {   
         int bottomPadding = stride * (height - 1) + kernelHeight - node1->height - topPadding;
-        int rightPadding  = stride * (width  - 1) * kernelWidth  - node1->width  - leftPadding;
+        int rightPadding  = stride * (width  - 1) + kernelWidth  - node1->width  - leftPadding;
         assert (topPadding  < kernelHeight && bottomPadding < kernelHeight);
         assert (leftPadding < kernelWidth  && rightPadding  < kernelWidth);
 
@@ -680,14 +680,16 @@ namespace CG
         for (int a=0; a<height; ++a) {
             for (int b=0; b<width; ++b) {
                 int count = 0;
-                dtype max = NAN;
+                dtype max = std::nan("");
                 for (int i=0; i<kheight; ++i) {
                     for (int j=0; j<kwidth; ++j) {
-                        if (!inDomain(a * sw + i - pt, b * sw + j - pl)) {
+                        int col = a * sw + i - pt;
+                        int row = b * sw + j - pl;
+                        if (!inDomain(col, row)) {
                             continue;
                         }
-                        dtype d = getDomData(a * sw + i - pt, b * sw + j - pl);
-                        if (max == NAN || max < d) {
+                        dtype d = getDomData(col, row);
+                        if (std::isnan(max) || max < d) {
                             max = d;
                             count = 1;
                         } else if (max == d) {
@@ -695,7 +697,7 @@ namespace CG
                         }
                     }
                 }
-                assert (max != NAN);
+                assert (!std::isnan(max));
                 data.at(a * width + b) = max;
                 maxCount.at(a * width + b) = count;
             }
@@ -714,8 +716,8 @@ namespace CG
                         int col = (a - i + pt) / sw;
                         int row = (b - j + pl) / sw;
                         if (   0 <= col && col < height && 0 <= row && row < width
-                            && (backward.at(0)->data.at(a * bwidth +b) == getDomData(col, row))) {
-                            backward.at(0)->grad.at(a * bwidth + b) += grad.at(col * width + row) / maxCount.at(a * width + b);
+                            && (backward.at(0)->data.at(a * bwidth + b) == data.at(col * width + row))) {
+                            backward.at(0)->grad.at(a * bwidth + b) += grad.at(col * width + row) / maxCount.at(col * width + row);
                         }
                     }
                 }
