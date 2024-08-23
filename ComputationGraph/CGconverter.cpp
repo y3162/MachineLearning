@@ -65,7 +65,7 @@ namespace CGC
             assert (conv != nullptr);
             *out << "id " << p2i[conv] << std::endl;
             *out << "Node Concatenation" << std::endl;
-            *out << "size " << node->backward.size() << std::endl;
+            *out << "channel " << node->backward.size() << std::endl;
             *out << "back";
             for (int i=0; i<node->backward.size(); ++i) {
                 *out << " " << p2i[node->backward.at(i)];
@@ -170,29 +170,37 @@ namespace CGC
             assert (conv != nullptr);
             *out << "id " << p2i[conv] << std::endl;
             *out << "Node Convolution2d" << std::endl;
+            *out << "channel " << conv->backward.size() << std::endl;
+            *out << "back";
+            for (int i=0; i<node->backward.size(); ++i) {
+                *out << " " << p2i[node->backward.at(i)];
+            }
+            *out << std::endl;
             *out << "data " << conv->height << " " << conv->width << std::endl;
-            *out << "back " << p2i[conv->backward.at(0)] << std::endl;
             *out << "stride " << conv->sw << std::endl;
             *out << "padding " << conv->pt << " " << conv->pt << std::endl;
             *out << "bias " << conv->bias << std::endl;
             *out << "kernel " << conv->kheight << " " << conv->kwidth << std::endl;
-            for (int i=0; i<conv->kernel.size(); ++i) {
-                for (int j=0; j<conv->kernel.at(i).size(); ++j) {
-                    if (j != 0) {
-                        *out << " ";
+            for (int c=0; c<conv->backward.size(); ++c) {
+                for (int i=0; i<conv->kernel.at(c).size(); ++i) {
+                    for (int j=0; j<conv->kernel.at(c).at(i).size(); ++j) {
+                        if (j != 0) {
+                            *out << " ";
+                        }
+                        *out << conv->kernel.at(c).at(i).at(j);
                     }
-                    *out << conv->kernel.at(i).at(j);
+                    *out << std::endl;
                 }
-                *out << std::endl;
+                //*out << std::endl;
             }
-        } else if (typeid(*node) == typeid(CG::MaxPooling)) {
+        } else if (typeid(*node) == typeid(CG::MaxPooling2d)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
                 convert(node->backward.at(0));
             }
-            CG::MaxPooling *maxp = dynamic_cast<CG::MaxPooling*>(node);
+            CG::MaxPooling2d *maxp = dynamic_cast<CG::MaxPooling2d*>(node);
             assert (maxp != nullptr);
             *out << "id " << p2i[maxp] << std::endl;
-            *out << "Node MaxPooling" << std::endl;
+            *out << "Node MaxPooling2d" << std::endl;
             *out << "data " << maxp->height << " " << maxp->width << std::endl;
             *out << "back " << p2i[maxp->backward.at(0)] << std::endl;
             *out << "stride " << maxp->sw << std::endl;

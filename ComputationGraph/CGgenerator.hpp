@@ -8,6 +8,7 @@ namespace CGG
 {
     template<typename T> using vec1 = CG::vec1<T>;
     template<typename T> using vec2 = CG::vec2<T>;
+    template<typename T> using vec3 = type::vec3<T>;
     using dtype = CG::dtype;
 
     vec2<dtype> initWeight(std::string initType, size_t domSize, size_t ranSize);

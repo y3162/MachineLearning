@@ -11,6 +11,7 @@ namespace CGC
 {
     template<typename T> using vec1 = type::vec1<T>;
     template<typename T> using vec2 = type::vec2<T>;
+    template<typename T> using vec3 = type::vec3<T>;
     using dtype = type::dtype;
 
     class Converter

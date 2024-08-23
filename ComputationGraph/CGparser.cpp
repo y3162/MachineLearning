@@ -62,7 +62,7 @@ namespace CGP
             int size;
             vec1<CG::Node*> nodes;
             *in >> token;
-            assert (token == "size");
+            assert (token == "channel");
             *in >> size;
             *in >> token;
             assert (token == "back");
@@ -176,18 +176,26 @@ namespace CGP
             i2p[id] = ret1;
             return ret1;
         } else if (token == "Convolution2d") {
-            size_t h, w;
+            size_t ch, h, w;
+            vec1<CG::Node*> nodes;
             size_t s, pt, pl, kh, kw;
-            vec2<dtype> k;
+            vec3<dtype> k;
             dtype b;
 
             *in >> token;
-            assert (token == "data");
-            *in >> h >> w;
+            assert (token == "channel");
+            *in >> ch;
+            nodes.resize(ch);
             *in >> token;
             assert (token == "back");
-            *in >> id1;
-            assert (i2p.find(id1) != i2p.end());
+            for (int c=0; c<ch; ++c) {
+                *in >> id1;
+                assert (i2p.find(id1) != i2p.end());
+                nodes.at(c) = i2p[id1];
+            }
+            *in >> token;
+            assert (token == "data");
+            *in >> h >> w;
             *in >> token;
             assert (token == "stride");
             *in >> s;
@@ -200,17 +208,20 @@ namespace CGP
             *in >> token;
             assert (token == "kernel");
             *in >> kh >> kw;
-            k.resize(kh);
-            for (int i=0; i<kh; ++i) {
-                k.at(i).resize(kw);
-                for (int j=0; j<kw; ++j) {
-                    *in >> k.at(i).at(j);
+            k.resize(ch);
+            for (int c=0; c<ch; ++c) {
+                k.at(c).resize(kh);
+                for (int i=0; i<kh; ++i) {
+                    k.at(c).at(i).resize(kw);
+                    for (int j=0; j<kw; ++j) {
+                        *in >> k.at(c).at(i).at(j);
+                    }
                 }
             }
-            CG::Convolution2d *ret1 = new CG::Convolution2d(i2p[id1], k, b, s, pt, pl, h, w);
+            CG::Convolution2d *ret1 = new CG::Convolution2d(nodes, k, b, s, pt, pl, h, w);
             i2p[id] = ret1;
             return ret1;
-        } else if (token == "MaxPooling") {
+        } else if (token == "MaxPooling2d") {
             size_t h, w;
             size_t s, pt, pl, kh, kw;
 
@@ -230,7 +241,7 @@ namespace CGP
             *in >> token;
             assert (token == "filter");
             *in >> kh >> kw;
-            CG::MaxPooling *ret1 = new CG::MaxPooling(i2p[id1], kh, kw, s, h, w);
+            CG::MaxPooling2d *ret1 = new CG::MaxPooling2d(i2p[id1], kh, kw, s, h, w);
             i2p[id] = ret1;
             return ret1;
         } else {

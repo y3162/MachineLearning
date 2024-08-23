@@ -10,22 +10,22 @@ namespace CG
 {
     template<typename T> using vec1 = type::vec1<T>;
     template<typename T> using vec2 = type::vec2<T>;
+    template<typename T> using vec3 = type::vec3<T>;
     using dtype = type::dtype;
-
     class Node
     {
         public :
-            size_t      domsize;
-            size_t      height;
-            size_t      width;
-            vec1<dtype> data;
-            vec1<dtype> grad;
-            vec1<Node*> forward;
-            vec1<Node*> backward;
-            int         f_count = 0;
-            int         b_count = 0;
+            const size_t domsize;
+            const size_t height;
+            const size_t width;
+            vec1<dtype>  data;
+            vec1<dtype>  grad;
+            vec1<Node*>  forward;
+            vec1<Node*>  backward;
+            int          f_count = 0;
+            int          b_count = 0;
 
-            Node ();
+            Node (size_t domsize, size_t height, size_t width);
 
             void pushThis(Node *node);
 
@@ -44,7 +44,7 @@ namespace CG
         public :
             Leaf1 (size_t size);
 
-            void getInput(const vec1<dtype> input);
+            void getInput(vec1<dtype> input);
     };
 
     class Leaf2 : public Node
@@ -52,8 +52,8 @@ namespace CG
         public :
             Leaf2 (size_t height, size_t width);
 
-            void getInput(const vec1<dtype> input);
-            void getInput(const vec2<dtype> input);
+            void getInput(vec1<dtype> input);
+            void getInput(vec2<dtype> input);
     };
 
     class Concatenation : public Node
@@ -94,20 +94,20 @@ namespace CG
             Mto1 (Node *node1);
     };
 
-    class Filter : public Node
+    class Filter2d : public Node
     {
         public :
-            size_t channnel;
-            size_t kheight;
-            size_t kwidth;
-            size_t pl;
-            size_t pt;
-            size_t sw;
+            const size_t kheight;
+            const size_t kwidth;
+            const size_t pl;
+            const size_t pt;
+            const size_t sw;
 
-            Filter (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+            Filter2d (vec1<Node*> nodes, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
 
             bool inDomain(int col, int row);
 
+            dtype getDomData(int index, int col, int row);
             dtype getDomData(int col, int row);
     };
 
@@ -198,8 +198,8 @@ namespace CG
             vec2<dtype> gradWeight;
             const dtype bias;
             
-            Affine (Node *node1, const vec2<dtype> Weight, dtype bias);
-            Affine (Node *node1, const vec2<dtype> Weight);
+            Affine (Node *node1, vec2<dtype> Weight, dtype bias);
+            Affine (Node *node1, vec2<dtype> Weight);
 
             virtual void calcData();
 
@@ -208,19 +208,19 @@ namespace CG
             virtual void updateParameters(dtype eta);
     };
 
-    class Convolution2d : public Filter
+    class Convolution2d : public Filter2d
     {
         public :
-            vec2<dtype> kernel;
-            vec2<dtype> gradKernel;
+            vec3<dtype> kernel;
+            vec3<dtype> gradKernel;
             dtype       bias;
             dtype       gradBias;
 
-            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
-            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width);
-            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t stride);
-            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias, size_t height, size_t width);
-            Convolution2d (Node *node1, const vec2<dtype> Kernel, dtype bias);
+            Convolution2d (vec1<Node*> nodes, vec3<dtype> Kernel, dtype bias, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+            Convolution2d (vec1<Node*> nodes, vec3<dtype> Kernel, dtype bias, size_t stride, size_t height, size_t width);
+            Convolution2d (vec1<Node*> nodes, vec3<dtype> Kernel, dtype bias, size_t stride);
+            Convolution2d (vec1<Node*> nodes, vec3<dtype> Kernel, dtype bias, size_t height, size_t width);
+            Convolution2d (vec1<Node*> nodes, vec3<dtype> Kernel, dtype bias);
 
             virtual void calcData();
 
@@ -229,19 +229,22 @@ namespace CG
             virtual void updateParameters(dtype eta);
     };
 
-    class MaxPooling : public Filter
+    class MaxPooling2d : public Filter2d
     {
         public :
             vec1<unsigned int> maxCount;
 
-            MaxPooling (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
-            MaxPooling (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t height, size_t width);
-            MaxPooling (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride);
+            MaxPooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+            MaxPooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t height, size_t width);
+            MaxPooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride);
 
             virtual void calcData();
 
             virtual void calcPartialDerivative();
     };
+
+    size_t getSumSizeOfData(vec1<Node*> nodes);
+    size_t getSumSizeOfHeight(vec1<Node*> nodes);
 
     void dumpNode (Node const node1, std::string name);
 };
