@@ -38,6 +38,17 @@ namespace CGG
         return ret;
     }
 
+    vec3<dtype> initKernel(std::string initType, size_t channel, size_t height, size_t width)
+    {
+        vec3<dtype> ret;
+        ret.resize(channel);
+        for (int i=0; i<channel; ++i) {
+            ret.at(i) = initWeight(initType, height-1, width);
+        }
+
+        return ret;
+    }
+
     CG::Node* setLossFunction(CG::Node *output, CG::Node *target, std::string lossType)
     {
         if (lossType == "MSE") {
@@ -62,23 +73,23 @@ namespace CGG
 
 
 
-    FNN::FNN (CG::Leaf1 *input, CG::Leaf1 *target, CG::Node *output, CG::Node *loss)
+    NN1d::NN1d (CG::Leaf1 *input, CG::Leaf1 *target, CG::Node *output, CG::Node *loss)
     : input(input), target(target), output(output), loss(loss)
     {
         assert (loss->data.size() == 1);
     }
 
-    vec1<dtype> FNN::expect(const vec1<dtype> expectData)
+    vec1<dtype> NN1d::expect(vec1<dtype> expectData)
     {
         input->getInput(expectData);
-
         input->forwardPropagation();
+
         target->forwardPropagation();
 
         return output->data;
     }
 
-    dtype FNN::test(const vec1<dtype> testData, const vec1<dtype> targetData)
+    dtype NN1d::test(vec1<dtype> testData, vec1<dtype> targetData)
     {
         input->getInput(testData);
         target->getInput(targetData);
@@ -89,7 +100,7 @@ namespace CGG
         return loss->data.at(0);
     }
 
-    dtype FNN::train(const vec1<dtype> trainData, const vec1<dtype> targetData)
+    dtype NN1d::train(vec1<dtype> trainData, vec1<dtype> targetData)
     {
         input->getInput(trainData);
         target->getInput(targetData);
@@ -101,14 +112,60 @@ namespace CGG
         return loss->data.at(0);
     }
 
-    void FNN::update(dtype eta)
+    void NN1d::update(dtype eta)
     {
         loss->update(eta);
     }
 
 
 
-    FNN* parseFeedForward(std::string filename)
+    NN2d::NN2d (CG::Leaf2 *input, CG::Leaf1 *target, CG::Node *output, CG::Node *loss)
+    : input(input), target(target), output(output), loss(loss)
+    {
+        assert (loss->data.size() == 1);
+    }
+
+    vec1<dtype> NN2d::expect(vec2<dtype> expectData)
+    {
+        input->getInput(expectData);
+        input->forwardPropagation();
+
+        target->forwardPropagation();
+
+        return output->data;
+    }
+
+    dtype NN2d::test(vec2<dtype> testData, vec1<dtype> targetData)
+    {
+        input->getInput(testData);
+        target->getInput(targetData);
+
+        input->forwardPropagation();
+        target->forwardPropagation();
+
+        return loss->data.at(0);
+    }
+
+    dtype NN2d::train(vec2<dtype> trainData, vec1<dtype> targetData)
+    {
+        input->getInput(trainData);
+        target->getInput(targetData);
+
+        input->forwardPropagation();
+        target->forwardPropagation();
+        loss->backwardPropagation();
+        
+        return loss->data.at(0);
+    }
+
+    void NN2d::update(dtype eta)
+    {
+        loss->update(eta);
+    }
+
+
+
+    NN1d* parseFeedForward(std::string filename)
     {
         CGP::Parser P;
         CG::Node *loss = P.parseAll(filename);
@@ -124,10 +181,10 @@ namespace CGG
 
         CG::Leaf1 *input = dynamic_cast<CG::Leaf1*>(temp);
 
-        return new FNN(input, target, output, loss);
+        return new NN1d(input, target, output, loss);
     }
 
-    FNN* feedForwardReLU(const vec1<size_t> nodes, std::string normlizationType, std::string lossType)
+    NN1d* feedForwardReLU(vec1<size_t> nodes, std::string normlizationType, std::string lossType)
     {   
         CG::Leaf1* input = new CG::Leaf1(nodes.at(0));
         CG::Node* output = input;
@@ -144,5 +201,112 @@ namespace CGG
 
         CG::Node* loss = setLossFunction(output, target, lossType);
 
-        return new FNN(input, target, output, loss);
+        return new NN1d(input, target, output, loss);
     }
+
+    NN2d* Lenet5(size_t height, size_t width)
+    {
+        /* Input Layer */
+        CG::Leaf2 *i0 = new CG::Leaf2(height, width);
+
+
+
+        /* C1- Convolution Layer */
+        vec1<CG::Convolution2d*> c1 = vec1<CG::Convolution2d*>(6);
+        for (int i=0; i<6; ++i) {
+            c1.at(i) = new CG::Convolution2d({i0}, initKernel("He", 1, 5, 5), 0, 28, 28);
+        }
+
+        vec1<CG::ReLU*> a1 = vec1<CG::ReLU*>(6);
+        for (int i=0; i<6; ++i) {
+            a1.at(i) = new CG::ReLU(c1.at(i));
+        }
+
+
+        
+        /* S2- Pooling Layer */
+        vec1<CG::AveragePooling2d*> s2 = vec1<CG::AveragePooling2d*>(6);
+        for (int i=0; i<6; ++i) {
+            s2.at(i) = new CG::AveragePooling2d(a1.at(i), 2, 2, 2);
+        }
+
+        vec1<CG::ReLU*> a2 = vec1<CG::ReLU*>(6);
+        for (int i=0; i<6; ++i) {
+            a2.at(i) = new CG::ReLU(s2.at(i));
+        }
+
+
+
+        /* C3- Convolution Layer */
+        vec1<CG::Convolution2d*> c3 = {  new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(2)}, initKernel("He", 3, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(1), a2.at(2), a2.at(3)}, initKernel("He", 3, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(2), a2.at(3), a2.at(4)}, initKernel("He", 3, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 3, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(4), a2.at(5), a2.at(0)}, initKernel("He", 3, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(5), a2.at(0), a2.at(1)}, initKernel("He", 3, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(2), a2.at(3)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(1), a2.at(2), a2.at(3), a2.at(4)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(2), a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(3), a2.at(4), a2.at(5), a2.at(0)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(3), a2.at(4)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(1), a2.at(2), a2.at(4), a2.at(5)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(2), a2.at(3), a2.at(5), a2.at(0)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(2), a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 16, 5, 5), 0)};
+
+        vec1<CG::ReLU*> a3 = vec1<CG::ReLU*>(16);
+        for (int i=0; i<16; ++i) {
+            a3.at(i) = new CG::ReLU(c3.at(i));
+        }
+
+
+
+        /* S4- Pooling Layer */
+        vec1<CG::AveragePooling2d*> s4 = vec1<CG::AveragePooling2d*>(16);
+        for (int i=0; i<16; ++i) {
+            s4.at(i) = new CG::AveragePooling2d(a3.at(i), 4, 4, 4);
+        }
+
+        vec1<CG::ReLU*> a4 = vec1<CG::ReLU*>(16);
+        for (int i=0; i<16; ++i) {
+            a4.at(i) = new CG::ReLU(s4.at(i));
+        }
+
+
+
+        /* C5- Convolution Layer */
+        vec1<CG::Node*> arg5 = vec1<CG::Node*>(16);
+        for (int i=0; i<16; ++i) {
+            arg5.at(i) = a4.at(i);
+        }
+        vec1<CG::Convolution2d*> c5 = vec1<CG::Convolution2d*>(120);
+        for (int i=0; i<120; ++i) {
+            c5.at(i) = new CG::Convolution2d(arg5, initKernel("He", 16, 5, 5), 0, 5);
+        }
+
+        vec1<CG::ReLU*> a5 = vec1<CG::ReLU*>(120);
+        for (int i=0; i<120; ++i) {
+            a5.at(i) = new CG::ReLU(c5.at(i));
+        }
+
+        /* F6- Fully Connected Layer */
+        vec1<CG::Node*> arg6 = vec1<CG::Node*>(16);
+        for (int i=0; i<16; ++i) {
+            arg6.at(i) = a5.at(i);
+        }
+        CG::Node* c6 = new CG::Concatenation(arg6);
+        CG::Affine* f6 = new CG::Affine(c6, initWeight("He", 120, 10), 1);
+
+
+
+        /* Target Layer */
+        CG::Leaf1* target = new CG::Leaf1(10);
+
+
+
+        /* Output Layer */
+        CG::Softmax* o7 = new CG::Softmax(o7);
+
+
+
+        return new NN2d(i0, target, f6, o7);
+}

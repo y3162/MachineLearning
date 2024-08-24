@@ -206,6 +206,19 @@ namespace CGC
             *out << "stride " << maxp->sw << std::endl;
             *out << "padding " << maxp->pt << " " << maxp->pt << std::endl;
             *out << "filter " << maxp->kheight << " " << maxp->kwidth << std::endl;
+        } else if (typeid(*node) == typeid(CG::AveragePooling2d)) {
+            if (p2i.find(node->backward.at(0)) == p2i.end()) {
+                convert(node->backward.at(0));
+            }
+            CG::AveragePooling2d *maxp = dynamic_cast<CG::AveragePooling2d*>(node);
+            assert (maxp != nullptr);
+            *out << "id " << p2i[maxp] << std::endl;
+            *out << "Node AveragePooling2d" << std::endl;
+            *out << "data " << maxp->height << " " << maxp->width << std::endl;
+            *out << "back " << p2i[maxp->backward.at(0)] << std::endl;
+            *out << "stride " << maxp->sw << std::endl;
+            *out << "padding " << maxp->pt << " " << maxp->pt << std::endl;
+            *out << "filter " << maxp->kheight << " " << maxp->kwidth << std::endl;
         } else {
             assert (false);
         }

@@ -737,6 +737,62 @@ namespace CG
 
 
 
+    AveragePooling2d::AveragePooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
+    : Filter2d ({node1}, kernelHeight, kernelWidth, stride, topPadding, leftPadding, height, width)
+    {   
+        int bottomPadding = stride * (height - 1) + kernelHeight - node1->height - topPadding;
+        int rightPadding  = stride * (width  - 1) + kernelWidth  - node1->width  - leftPadding;
+        assert (topPadding  < kernelHeight && bottomPadding < kernelHeight);
+        assert (leftPadding < kernelWidth  && rightPadding  < kernelWidth);
+    }
+
+    AveragePooling2d::AveragePooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t height, size_t width)
+    : AveragePooling2d (node1, kernelHeight, kernelWidth, stride, (stride*(height-1) + kernelHeight - node1->height)/2, (stride*(width-1) + kernelWidth - node1->width)/2, height, width){}
+
+    AveragePooling2d::AveragePooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride)
+    : AveragePooling2d (node1, kernelHeight, kernelWidth, stride, (node1->height - kernelHeight + (stride-1))/stride + 1, (node1->width - kernelWidth + (stride-1))/stride + 1){}
+
+    void AveragePooling2d::calcData()
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        for (int a=0; a<height; ++a) {
+            for (int b=0; b<width; ++b) {
+                dtype sum = 0;
+                for (int i=0; i<kheight; ++i) {
+                    for (int j=0; j<kwidth; ++j) {
+                        int col = a * sw + i - pt;
+                        int row = b * sw + j - pl;
+                        sum += getDomData(col, row);
+                    }
+                }
+                data.at(a * width + b) = sum / (kheight * kwidth);
+            }
+        }
+    }
+
+    void AveragePooling2d::calcPartialDerivative()
+    {
+        size_t bheight = backward.at(0)->height;
+        size_t bwidth  = backward.at(0)->width;
+        for (int a=0; a<bheight; ++a) {
+            for (int b=0; b<bwidth; ++b) {
+                //backward.at(0)->grad.at(a * bwidth + b) = 0;
+                for (int i=(a+pt)%sw; i<kheight; i+=sw) {
+                    for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
+                        int col = (a - i + pt) / sw;
+                        int row = (b - j + pl) / sw;
+                        if (   0 <= col && col < height && 0 <= row && row < width) {
+                            backward.at(0)->grad.at(a * bwidth + b) += grad.at(col * width + row) / (kheight * kwidth);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+
     size_t getSumSizeOfData(vec1<Node*> nodes)
     {
         size_t ret = 0;

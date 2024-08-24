@@ -19,9 +19,9 @@ vec2<dtype> loadDigitsData(std::string path)
     std::string num;
 
     vec2<dtype> ret;
-    ret.resize(1798);
-    for (int i=0; i<1798; ++i) {
-        ret.at(i).resize(8*8);
+    ret.resize(DIGITS_DATA_SIZE);
+    for (int i=0; i<DIGITS_DATA_SIZE; ++i) {
+        ret.at(i).resize(DIGITS_DATA_HEIGHT * DIGITS_DATA_WIDTH);
     }
 
     int i = 0, j = 0;
@@ -38,10 +38,10 @@ vec2<dtype> loadDigitsData(std::string path)
             }
             ret.at(i).at(j++) = std::stod(num);
         }
-        assert (j == 64);
+        assert (j == DIGITS_DATA_HEIGHT * DIGITS_DATA_WIDTH);
         ++i;
     }
-    assert (i == 1797);
+    assert (i == DIGITS_DATA_SIZE);
 
     return ret;
 }
@@ -59,8 +59,8 @@ vec2<dtype> loadDigitsTarget(std::string path)
     std::string num;
 
     vec2<dtype> ret;
-    ret.resize(1798);
-    for (int i=0; i<1798; ++i) {
+    ret.resize(DIGITS_DATA_SIZE);
+    for (int i=0; i<DIGITS_DATA_SIZE; ++i) {
         ret.at(i).resize(10, 0);
     }
 
@@ -77,7 +77,7 @@ vec2<dtype> loadDigitsTarget(std::string path)
         int temp = std::stoi(num);
         ret.at(i++).at(temp) = 1;
     }
-    assert (i == 1797);
+    assert (i == DIGITS_DATA_SIZE);
 
     return ret;
 }

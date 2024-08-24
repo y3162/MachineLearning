@@ -243,6 +243,18 @@ namespace CG
             virtual void calcPartialDerivative();
     };
 
+    class AveragePooling2d : public Filter2d
+    {
+        public :
+            AveragePooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width);
+            AveragePooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t height, size_t width);
+            AveragePooling2d (Node *node1, size_t kernelHeight, size_t kernelWidth, size_t stride);
+
+            virtual void calcData();
+
+            virtual void calcPartialDerivative();
+    };
+
     size_t getSumSizeOfData(vec1<Node*> nodes);
     size_t getSumSizeOfHeight(vec1<Node*> nodes);
 

@@ -244,6 +244,29 @@ namespace CGP
             CG::MaxPooling2d *ret1 = new CG::MaxPooling2d(i2p[id1], kh, kw, s, h, w);
             i2p[id] = ret1;
             return ret1;
+        } else if (token == "AveragePooling2d") {
+            size_t h, w;
+            size_t s, pt, pl, kh, kw;
+
+            *in >> token;
+            assert (token == "data");
+            *in >> h >> w;
+            *in >> token;
+            assert (token == "back");
+            *in >> id1;
+            assert (i2p.find(id1) != i2p.end());
+            *in >> token;
+            assert (token == "stride");
+            *in >> s;
+            *in >> token;
+            assert (token == "padding");
+            *in >> pt >> pl;
+            *in >> token;
+            assert (token == "filter");
+            *in >> kh >> kw;
+            CG::AveragePooling2d *ret1 = new CG::AveragePooling2d(i2p[id1], kh, kw, s, h, w);
+            i2p[id] = ret1;
+            return ret1;
         } else {
             assert (false);
         }
