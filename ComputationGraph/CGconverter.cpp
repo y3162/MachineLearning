@@ -128,6 +128,20 @@ namespace CGC
             *out << "id " << p2i[node] << std::endl;
             *out << "Node ReLU" << std::endl;
             *out << "back " << p2i[node->backward.at(0)] << std::endl;
+        } else if (typeid(*node) == typeid(CG::Sigmoid)) {
+            if (p2i.find(node->backward.at(0)) == p2i.end()) {
+                convert(node->backward.at(0));
+            }
+            *out << "id " << p2i[node] << std::endl;
+            *out << "Node Sigmoid" << std::endl;
+            *out << "back " << p2i[node->backward.at(0)] << std::endl;
+        } else if (typeid(*node) == typeid(CG::Tanh)) {
+            if (p2i.find(node->backward.at(0)) == p2i.end()) {
+                convert(node->backward.at(0));
+            }
+            *out << "id " << p2i[node] << std::endl;
+            *out << "Node Tanh" << std::endl;
+            *out << "back " << p2i[node->backward.at(0)] << std::endl;
         } else if (typeid(*node) == typeid(CG::Softmax)) {
             if (p2i.find(node->backward.at(0)) == p2i.end()) {
                 convert(node->backward.at(0));
@@ -168,6 +182,11 @@ namespace CGC
             }
             CG::Convolution2d*conv = dynamic_cast<CG::Convolution2d*>(node);
             assert (conv != nullptr);
+            for (int i=0; i<node->backward.size(); ++i) {
+                if (p2i.find(node->backward.at(i)) == p2i.end()) {
+                    convert(node->backward.at(i));
+                }
+            }
             *out << "id " << p2i[conv] << std::endl;
             *out << "Node Convolution2d" << std::endl;
             *out << "channel " << conv->backward.size() << std::endl;

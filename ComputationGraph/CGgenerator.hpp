@@ -59,6 +59,8 @@ namespace CGG
 
     NN1d* feedForwardReLU(vec1<size_t> nodes, std::string normalizationType, std::string lossType);
 
+    NN2d* parseLenet5(std::string filename);
+
     NN2d* Lenet5(size_t height, size_t width);
 }
 

@@ -184,6 +184,24 @@ namespace CGG
         return new NN1d(input, target, output, loss);
     }
 
+    NN2d* parseLenet5(std::string filename)
+    {
+        CGP::Parser P;
+        CG::Node *loss = P.parseAll(filename);
+
+        CG::Node  *output = loss->backward.at(0);
+        CG::Leaf1 *target = dynamic_cast<CG::Leaf1*>(loss->backward.at(1));
+
+        CG::Node *temp = output;
+        while (temp->backward.size() != 0) {
+            temp = temp->backward.at(0);
+        }
+
+        CG::Leaf2 *input = dynamic_cast<CG::Leaf2*>(temp);
+
+        return new NN2d(input, target, output, loss);
+    }
+
     NN1d* feedForwardReLU(vec1<size_t> nodes, std::string normlizationType, std::string lossType)
     {   
         CG::Leaf1* input = new CG::Leaf1(nodes.at(0));
@@ -248,10 +266,12 @@ namespace CGG
                                        , new CG::Convolution2d({a2.at(1), a2.at(2), a2.at(3), a2.at(4)}, initKernel("He", 4, 5, 5), 0)
                                        , new CG::Convolution2d({a2.at(2), a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 4, 5, 5), 0)
                                        , new CG::Convolution2d({a2.at(3), a2.at(4), a2.at(5), a2.at(0)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(4), a2.at(5), a2.at(0), a2.at(1)}, initKernel("He", 4, 5, 5), 0)
+                                       , new CG::Convolution2d({a2.at(5), a2.at(0), a2.at(1), a2.at(2)}, initKernel("He", 4, 5, 5), 0)
                                        , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(3), a2.at(4)}, initKernel("He", 4, 5, 5), 0)
                                        , new CG::Convolution2d({a2.at(1), a2.at(2), a2.at(4), a2.at(5)}, initKernel("He", 4, 5, 5), 0)
                                        , new CG::Convolution2d({a2.at(2), a2.at(3), a2.at(5), a2.at(0)}, initKernel("He", 4, 5, 5), 0)
-                                       , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(2), a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 16, 5, 5), 0)};
+                                       , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(2), a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 6, 5, 5), 0)};
 
         vec1<CG::ReLU*> a3 = vec1<CG::ReLU*>(16);
         for (int i=0; i<16; ++i) {
@@ -263,7 +283,7 @@ namespace CGG
         /* S4- Pooling Layer */
         vec1<CG::AveragePooling2d*> s4 = vec1<CG::AveragePooling2d*>(16);
         for (int i=0; i<16; ++i) {
-            s4.at(i) = new CG::AveragePooling2d(a3.at(i), 4, 4, 4);
+            s4.at(i) = new CG::AveragePooling2d(a3.at(i), 2, 2, 2);
         }
 
         vec1<CG::ReLU*> a4 = vec1<CG::ReLU*>(16);
@@ -280,7 +300,7 @@ namespace CGG
         }
         vec1<CG::Convolution2d*> c5 = vec1<CG::Convolution2d*>(120);
         for (int i=0; i<120; ++i) {
-            c5.at(i) = new CG::Convolution2d(arg5, initKernel("He", 16, 5, 5), 0, 5);
+            c5.at(i) = new CG::Convolution2d(arg5, initKernel("He", 16, 5, 5), 0);
         }
 
         vec1<CG::ReLU*> a5 = vec1<CG::ReLU*>(120);
@@ -288,13 +308,16 @@ namespace CGG
             a5.at(i) = new CG::ReLU(c5.at(i));
         }
 
+
+
         /* F6- Fully Connected Layer */
-        vec1<CG::Node*> arg6 = vec1<CG::Node*>(16);
-        for (int i=0; i<16; ++i) {
+        vec1<CG::Node*> arg6 = vec1<CG::Node*>(120);
+        for (int i=0; i<120; ++i) {
             arg6.at(i) = a5.at(i);
         }
         CG::Node* c6 = new CG::Concatenation(arg6);
         CG::Affine* f6 = new CG::Affine(c6, initWeight("He", 120, 10), 1);
+        CG::Softmax* o6 = new CG::Softmax(f6);
 
 
 
@@ -304,9 +327,10 @@ namespace CGG
 
 
         /* Output Layer */
-        CG::Softmax* o7 = new CG::Softmax(o7);
+        CG::CEE* l7 = new CG::CEE(o6, target);
 
+        
 
-
-        return new NN2d(i0, target, f6, o7);
+        return new NN2d(i0, target, o6, l7);
+    }
 }

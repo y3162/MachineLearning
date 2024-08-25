@@ -171,6 +171,26 @@ namespace CG
             virtual void calcPartialDerivative();
     };
 
+    class Sigmoid : public MtoM
+    {
+        public :
+            Sigmoid (Node *node1);
+
+            virtual void calcData();
+
+            virtual void calcPartialDerivative();
+    };
+
+    class Tanh : public MtoM
+    {
+        public :
+            Tanh (Node *node1);
+
+            virtual void calcData();
+
+            virtual void calcPartialDerivative();
+    };
+
     class Softmax : public MtoM
     {
         public : 

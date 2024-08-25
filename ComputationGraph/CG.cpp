@@ -390,7 +390,7 @@ namespace CG
     {
         data.at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-200);
+            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-10);
             data.at(0) -= backward.at(1)->data.at(i) * std::log(d1);
         }
     }
@@ -398,7 +398,7 @@ namespace CG
     void CEE::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-200);
+            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-10);
             backward.at(0)->grad.at(i) -= backward.at(1)->data.at(i) / d1 * grad.at(0);
             backward.at(1)->grad.at(i) -= std::log(backward.at(0)->data.at(i)) * grad.at(0);
         }
@@ -424,6 +424,45 @@ namespace CG
 
 
 
+    Sigmoid::Sigmoid (Node *node1) : MtoM (node1){};
+
+    void Sigmoid::calcData()
+    {
+        for (int i=0; i<domsize; ++i) {
+            dtype x = std::max(10.0, std::min(-10.0, backward.at(0)->data.at(i)));
+            data.at(i) = 1 / (1 + std::exp(-x));
+        }
+    }
+
+    void Sigmoid::calcPartialDerivative()
+    {
+        for (int i=0; i<domsize; ++i) {
+            data.at(i) = data.at(i) * (1 - (data.at(i))) * grad.at(i);
+        }
+    }
+
+
+
+    Tanh::Tanh (Node *node1) : MtoM (node1){};
+
+    void Tanh::calcData()
+    {
+        for (int i=0; i<domsize; ++i) {
+            dtype x = std::max(10.0, std::min(-10.0, backward.at(0)->data.at(i)));
+            dtype e2x = std::exp(2 * x);
+            data.at(i) = (e2x - 1) / (e2x + 1);
+        }
+    }
+
+    void Tanh::calcPartialDerivative()
+    {
+        for (int i=0; i<domsize; ++i) {
+            data.at(i) = (1 - (data.at(i)) * (data.at(i))) * grad.at(i);
+        }
+    }
+
+
+
     Softmax::Softmax (Node *node1) : MtoM (node1){}
 
     void Softmax::calcData()
@@ -435,12 +474,12 @@ namespace CG
 
         dtype sum = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
+            dtype z = std::max(backward.at(0)->data.at(i)-max, -10.0);
             sum += std::exp(z);
         }
 
         for (int i=0; i<domsize; ++i) {
-            dtype z = std::max(backward.at(0)->data.at(i)-max, -200.0);
+            dtype z = std::max(backward.at(0)->data.at(i)-max, -10.0);
             data.at(i) = std::exp(z) / sum;
         }
     }
@@ -450,9 +489,9 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<domsize; ++j) {
                 if (i == j) {
-                    backward.at(0)->grad.at(i) += (1 - data.at(i)) * data.at(j) * grad.at(j);
+                    backward.at(0)->grad.at(i) += data.at(j) * (1 - data.at(i)) * grad.at(j);
                 } else {
-                    backward.at(0)->grad.at(i) +=    - data.at(i)  * data.at(j) * grad.at(j);
+                    backward.at(0)->grad.at(i) -= data.at(j) *      data.at(i)  * grad.at(j);
                 }
             }
         }

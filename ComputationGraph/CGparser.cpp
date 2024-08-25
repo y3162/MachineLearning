@@ -133,6 +133,22 @@ namespace CGP
             ret = new CG::ReLU(i2p[id1]);
             i2p[id] = ret;
             return ret;
+        } else if (token == "Sigmoid") {
+            *in >> token;
+            assert (token == "back");
+            *in >> id1;
+            assert (i2p.find(id1) != i2p.end());
+            ret = new CG::Sigmoid(i2p[id1]);
+            i2p[id] = ret;
+            return ret;
+        } else if (token == "Tanh") {
+            *in >> token;
+            assert (token == "back");
+            *in >> id1;
+            assert (i2p.find(id1) != i2p.end());
+            ret = new CG::Tanh(i2p[id1]);
+            i2p[id] = ret;
+            return ret;
         } else if (token == "Softmax") {
             *in >> token;
             assert (token == "back");
