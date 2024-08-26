@@ -429,7 +429,7 @@ namespace CG
     void Sigmoid::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype x = std::max(10.0, std::min(-10.0, backward.at(0)->data.at(i)));
+            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(i)));
             data.at(i) = 1 / (1 + std::exp(-x));
         }
     }
@@ -448,7 +448,7 @@ namespace CG
     void Tanh::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype x = std::max(10.0, std::min(-10.0, backward.at(0)->data.at(i)));
+            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(i)));
             dtype e2x = std::exp(2 * x);
             data.at(i) = (e2x - 1) / (e2x + 1);
         }

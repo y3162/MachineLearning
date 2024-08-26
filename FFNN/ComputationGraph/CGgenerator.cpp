@@ -235,9 +235,9 @@ namespace CGG
             c1.at(i) = new CG::Convolution2d({i0}, initKernel("He", 1, 5, 5), 0, 28, 28);
         }
 
-        vec1<CG::ReLU*> a1 = vec1<CG::ReLU*>(6);
+        vec1<CG::Tanh*> a1 = vec1<CG::Tanh*>(6);
         for (int i=0; i<6; ++i) {
-            a1.at(i) = new CG::ReLU(c1.at(i));
+            a1.at(i) = new CG::Tanh(c1.at(i));
         }
 
 
@@ -248,9 +248,9 @@ namespace CGG
             s2.at(i) = new CG::AveragePooling2d(a1.at(i), 2, 2, 2);
         }
 
-        vec1<CG::ReLU*> a2 = vec1<CG::ReLU*>(6);
+        vec1<CG::Sigmoid*> a2 = vec1<CG::Sigmoid*>(6);
         for (int i=0; i<6; ++i) {
-            a2.at(i) = new CG::ReLU(s2.at(i));
+            a2.at(i) = new CG::Sigmoid(s2.at(i));
         }
 
 
@@ -273,9 +273,9 @@ namespace CGG
                                        , new CG::Convolution2d({a2.at(2), a2.at(3), a2.at(5), a2.at(0)}, initKernel("He", 4, 5, 5), 0)
                                        , new CG::Convolution2d({a2.at(0), a2.at(1), a2.at(2), a2.at(3), a2.at(4), a2.at(5)}, initKernel("He", 6, 5, 5), 0)};
 
-        vec1<CG::ReLU*> a3 = vec1<CG::ReLU*>(16);
+        vec1<CG::Tanh*> a3 = vec1<CG::Tanh*>(16);
         for (int i=0; i<16; ++i) {
-            a3.at(i) = new CG::ReLU(c3.at(i));
+            a3.at(i) = new CG::Tanh(c3.at(i));
         }
 
 
@@ -286,9 +286,9 @@ namespace CGG
             s4.at(i) = new CG::AveragePooling2d(a3.at(i), 2, 2, 2);
         }
 
-        vec1<CG::ReLU*> a4 = vec1<CG::ReLU*>(16);
+        vec1<CG::Sigmoid*> a4 = vec1<CG::Sigmoid*>(16);
         for (int i=0; i<16; ++i) {
-            a4.at(i) = new CG::ReLU(s4.at(i));
+            a4.at(i) = new CG::Sigmoid(s4.at(i));
         }
 
 
@@ -303,9 +303,9 @@ namespace CGG
             c5.at(i) = new CG::Convolution2d(arg5, initKernel("He", 16, 5, 5), 0);
         }
 
-        vec1<CG::ReLU*> a5 = vec1<CG::ReLU*>(120);
+        vec1<CG::Tanh*> a5 = vec1<CG::Tanh*>(120);
         for (int i=0; i<120; ++i) {
-            a5.at(i) = new CG::ReLU(c5.at(i));
+            a5.at(i) = new CG::Tanh(c5.at(i));
         }
 
 
