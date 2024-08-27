@@ -50,7 +50,7 @@ namespace CGC
         if (typeid(*node) == typeid(CG::Leaf1)) {
             *out << "id " << p2i[node] << std::endl;
             *out << "Node Leaf1" << std::endl;
-            *out << "data " << node->data.size() << std::endl;
+            *out << "data " << node->dsize << std::endl;
         } else if (typeid(*node) == typeid(CG::Leaf2)) {
             *out << "id " << p2i[node] << std::endl;
             *out << "Node Leaf2" << std::endl;
@@ -166,7 +166,7 @@ namespace CGC
             *out << "Node Affine" << std::endl;
             *out << "back " << p2i[aff->backward.at(0)] << std::endl;
             *out << "bias " << aff->bias << std::endl;
-            *out << "weight " << aff->domsize << " " << aff->data.size() << std::endl;
+            *out << "weight " << aff->domsize << " " << aff->dsize << std::endl;
             for (int i=0; i<aff->weight.size(); ++i) {
                 for (int j=0; j<aff->weight.at(i).size(); ++j) {
                     if (j != 0) {

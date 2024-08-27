@@ -5,50 +5,73 @@
 #include "Type.hpp"
 
 namespace CG
-{
+{   
     Node::Node (size_t domsize, size_t height, size_t width)
-    : domsize(domsize), height(height), width(width)
-    {}
+    : domsize(domsize), height(height), width(width), dsize(height * width)
+    {
+        data.resize(1);
+        data.at(0).resize(dsize);
+        grad.resize(1);
+        grad.at(0).resize(dsize);
+        f_count.resize(1, 0);
+        b_count.resize(1, 0);
+    }
 
     void Node::pushThis(Node *node) // push this as argument's forward node
     {
         size_t fsize = node->forward.size();
-        node->forward.resize(fsize+1);
-        node->forward.at(fsize) = this;
+        node->forward.push_back(this);
     }
 
     void Node::calcData(){}
-    void Node::forwardPropagation()
+    void Node::forwardPropagation(ttype time)
     {
-        if (++b_count < backward.size()) {
+        if (++b_count.at(time) < backward.size()) {
             return;
         } else { // When all the forward passes from the units in the preceding layer have been completed
-            b_count = 0;
+            b_count.at(time) = 0;
         }
 
-        for (int i=0; i<grad.size(); ++i) {
-            grad.at(i) = 0;
+        assert (data.size() == grad.size());
+        if (data.size() == time) {
+            data.resize(time + 1);
+            data.at(time).resize(dsize);
+            grad.resize(time + 1);
+            grad.at(time).resize(dsize);
+            f_count.resize(time + 1);
+            b_count.resize(time + 1);
+        } else {
+            assert (data.size() > time);
+        }
+        
+        for (int i=0; i<dsize; ++i) {
+            grad.at(time).at(i) = 0;
         }
 
+        this->time = time;
         calcData();
 
         for (int i=0; i<forward.size(); ++i) {
             forward.at(i)->forwardPropagation();
         }
     }
+    void Node::forwardPropagation()
+    {
+        forwardPropagation(0);
+    }
 
     void Node::calcPartialDerivative(){}
-    void Node::backwardPropagation()
+    void Node::backwardPropagation(ttype time)
     {   
-        if (++f_count < forward.size()) {
+        if (++f_count.at(time) < forward.size()) {
             return;
         } else { // When all the backpropagations from the units in the next layer have been completed
-            f_count = 0;
+            f_count.at(time) = 0;
         }
 
         if (forward.size() == 0) {
-            assert (data.size() == 1);
-            grad.at(0) = 1;
+            assert (dsize == 1);
+            grad.at(0).at(0) = 1;
         }
         calcPartialDerivative();
 
@@ -56,14 +79,18 @@ namespace CG
             backward.at(i)->backwardPropagation();
         }
     }
+    void Node::backwardPropagation()
+    {
+        backwardPropagation(0);
+    }
 
     void Node::updateParameters(dtype eta){}
     void Node::update(dtype eta)
     {
-        if (++f_count < forward.size()) {
+        if (++f_count.at(time) < forward.size()) {
             return;
         } else { // When all the backpropagations from the units in the next layer have been completed
-            f_count = 0;
+            f_count.at(time) = 0;
         }
 
         updateParameters(eta);
@@ -77,34 +104,30 @@ namespace CG
 
     Leaf1::Leaf1 (size_t size)
     : Node (0, size, 1)
-    { 
-        data.resize(size);
-        grad.resize(size);
+    {
         forward.resize(0);
         backward.resize(0);
     }
 
     void Leaf1::getInput(vec1<dtype> input)
     {
-        assert (data.size() == input.size());
-        data = input;
+        assert (dsize == input.size());
+        data.at(0) = input;
     }
 
 
 
     Leaf2::Leaf2 (size_t height, size_t width)
     : Node (0, height, width)
-    {
-        data.resize(height * width);
-        grad.resize(height * width);
+    {   
         forward.resize(0);
         backward.resize(0);
     }
 
     void Leaf2::getInput(vec1<dtype> input)
     {
-        assert (data.size() == input.size());
-        data = input;
+        assert (dsize == input.size());
+        data.at(0) = input;
     }
 
     void Leaf2::getInput(vec2<dtype> input)
@@ -114,7 +137,7 @@ namespace CG
         for (int i=0; i<height; ++i) {
             assert (input.at(i).size() == width);
             for (int j=0; j<width; ++j) {
-                data.at(i * width + j) = input.at(i).at(j);
+                data.at(0).at(i * width + j) = input.at(i).at(j);
             }
         }
     }
@@ -127,14 +150,11 @@ namespace CG
         dataSize.resize(nodes.size());
         for (int i=0; i<nodes.size(); ++i) {
             assert (nodes.at(i)->width == 1);
-            assert (nodes.at(i)->data.size() == nodes.at(i)->height);
+            assert (nodes.at(i)->dsize == nodes.at(i)->height);
             if (i>0) {
-                dataSize.at(i) = dataSize.at(i-1) + nodes.at(i-1)->data.size();
+                dataSize.at(i) = dataSize.at(i-1) + nodes.at(i-1)->dsize;
             }
         }
-
-        data.resize(domsize);
-        grad.resize(domsize);
 
         forward.resize(0);
 
@@ -161,7 +181,7 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             int index = whichNode(i);
             size_t remain = i - dataSize.at(index);
-            data.at(i) = backward.at(index)->data.at(remain);
+            data.at(0).at(i) = backward.at(index)->data.at(0).at(remain);
         }
     }
 
@@ -170,21 +190,18 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             int index = whichNode(i);
             size_t remain = i - dataSize.at(index);
-            backward.at(index)->grad.at(remain) = grad.at(i);
+            backward.at(index)->grad.at(0).at(remain) = grad.at(0).at(i);
         }
     }
 
 
 
     MMtoM::MMtoM (Node *node1, Node *node2)
-    : Node (node1->data.size(), node1->height, node1->width)
+    : Node (node1->dsize, node1->height, node1->width)
     {   
-        assert (node1->data.size() == node2->data.size());
+        assert (node1->dsize == node2->dsize);
         assert (node1->height == node2->height);
         assert (node1->width  == node2->width);
-
-        data.resize(domsize);
-        grad.resize(domsize);
 
         forward.resize(0);
 
@@ -199,14 +216,11 @@ namespace CG
     
     
     MMto1::MMto1 (Node *node1, Node *node2)
-    : Node (node1->data.size(), 1, 1)
+    : Node (node1->dsize, 1, 1)
     {   
-        assert (node1->data.size() == node2->data.size());
+        assert (node1->dsize == node2->dsize);
         assert (node1->height == node2->height);
         assert (node1->width  == node2->width);
-
-        data.resize(1);
-        grad.resize(1);
 
         forward.resize(0);
 
@@ -221,11 +235,8 @@ namespace CG
 
 
     MtoM::MtoM (Node *node1)
-    : Node (node1->data.size(), node1->height, node1->width)
+    : Node (node1->dsize, node1->height, node1->width)
     {
-        data.resize(domsize);
-        grad.resize(domsize);
-
         forward.resize(0);
 
         backward.resize(1);
@@ -237,11 +248,8 @@ namespace CG
 
 
     Mto1::Mto1 (Node *node1)
-    : Node (node1->data.size(), 1, 1)
+    : Node (node1->dsize, 1, 1)
     {
-        data.resize(1);
-        grad.resize(1);
-
         forward.resize(0);
 
         backward.resize(1);
@@ -253,18 +261,15 @@ namespace CG
 
 
     Filter2d::Filter2d (vec1<Node*> nodes, size_t kernelHeight, size_t kernelWidth, size_t stride, size_t topPadding, size_t leftPadding, size_t height, size_t width)
-    : Node (nodes.at(0)->data.size(), height, width), kheight(kernelHeight), kwidth(kernelWidth), pt(topPadding), pl(leftPadding), sw(stride)
+    : Node (nodes.at(0)->dsize, height, width), kheight(kernelHeight), kwidth(kernelWidth), pt(topPadding), pl(leftPadding), sw(stride)
     {
         size_t channel = nodes.size();
 
         for (int c=0; c<channel; ++c) {
             assert (kernelHeight <= nodes.at(c)->height);
             assert (kernelWidth  <= nodes.at(c)->width);
-            assert (nodes.at(c)->height * nodes.at(c)->width == nodes.at(c)->data.size());
+            assert (nodes.at(c)->height * nodes.at(c)->width == nodes.at(c)->dsize);
         }
-
-        data.resize(height * width);
-        grad.resize(height * width);
 
         forward.resize(0);
 
@@ -290,7 +295,7 @@ namespace CG
     {
         size_t bwidth  = backward.at(0)->width;
         if (inDomain(col, row)) {
-            return backward.at(index)->data.at(col * bwidth + row);
+            return backward.at(index)->data.at(0).at(col * bwidth + row);
         } else {
             return 0;
         }
@@ -308,15 +313,15 @@ namespace CG
     void Add::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(i) = backward.at(0)->data.at(i) + backward.at(1)->data.at(i);
+            data.at(0).at(i) = backward.at(0)->data.at(0).at(i) + backward.at(1)->data.at(0).at(i);
         }
     }
 
     void Add::calcPartialDerivative()
     {   
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(i) += 1 * grad.at(i);
-            backward.at(1)->grad.at(i) += 1 * grad.at(i);
+            backward.at(0)->grad.at(0).at(i) += 1 * grad.at(0).at(i);
+            backward.at(1)->grad.at(0).at(i) += 1 * grad.at(0).at(i);
         }
     }
 
@@ -327,15 +332,15 @@ namespace CG
     void Sub::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(i) = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
+            data.at(0).at(i) = backward.at(0)->data.at(0).at(i) - backward.at(1)->data.at(0).at(i);
         }
     }
 
     void Sub::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(i) +=  1 * grad.at(i);
-            backward.at(1)->grad.at(i) += -1 * grad.at(i);
+            backward.at(0)->grad.at(0).at(i) +=  1 * grad.at(0).at(i);
+            backward.at(1)->grad.at(0).at(i) += -1 * grad.at(0).at(i);
         }
     }
 
@@ -345,17 +350,17 @@ namespace CG
 
     void Dots::calcData()
     {   
-        data.at(0) = 0;
+        data.at(0).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            data.at(0) += backward.at(0)->data.at(i) * backward.at(1)->data.at(i);
+            data.at(0).at(0) += backward.at(0)->data.at(0).at(i) * backward.at(1)->data.at(0).at(i);
         }
     }
 
     void Dots::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(i) += backward.at(1)->data.at(i) * grad.at(0);
-            backward.at(1)->grad.at(i) += backward.at(0)->data.at(i) * grad.at(0);
+            backward.at(0)->grad.at(0).at(i) += backward.at(1)->data.at(0).at(i) * grad.at(0).at(0);
+            backward.at(1)->grad.at(0).at(i) += backward.at(0)->data.at(0).at(i) * grad.at(0).at(0);
         }
     }
 
@@ -365,20 +370,20 @@ namespace CG
 
     void MSE::calcData()
     {   
-        data.at(0) = 0;
+        data.at(0).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
-            data.at(0) += err * err;
+            dtype err = backward.at(0)->data.at(0).at(i) - backward.at(1)->data.at(0).at(i);
+            data.at(0).at(0) += err * err;
         }
-        data.at(0) /= domsize;
+        data.at(0).at(0) /= domsize;
     }
 
     void MSE::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype err = backward.at(0)->data.at(i) - backward.at(1)->data.at(i);
-            backward.at(0)->grad.at(i) +=   2 * err * grad.at(0) / domsize;
-            backward.at(1)->grad.at(i) += - 2 * err * grad.at(0) / domsize;
+            dtype err = backward.at(0)->data.at(0).at(i) - backward.at(1)->data.at(0).at(i);
+            backward.at(0)->grad.at(0).at(i) +=   2 * err * grad.at(0).at(0) / domsize;
+            backward.at(1)->grad.at(0).at(i) += - 2 * err * grad.at(0).at(0) / domsize;
         }
     }
 
@@ -388,19 +393,19 @@ namespace CG
 
     void CEE::calcData()
     {
-        data.at(0) = 0;
+        data.at(0).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-10);
-            data.at(0) -= backward.at(1)->data.at(i) * std::log(d1);
+            dtype d1 = std::max(backward.at(0)->data.at(0).at(i), 1e-10);
+            data.at(0).at(0) -= backward.at(1)->data.at(0).at(i) * std::log(d1);
         }
     }
 
     void CEE::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype d1 = std::max(backward.at(0)->data.at(i), 1e-10);
-            backward.at(0)->grad.at(i) -= backward.at(1)->data.at(i) / d1 * grad.at(0);
-            backward.at(1)->grad.at(i) -= std::log(backward.at(0)->data.at(i)) * grad.at(0);
+            dtype d1 = std::max(backward.at(0)->data.at(0).at(i), 1e-10);
+            backward.at(0)->grad.at(0).at(i) -= backward.at(1)->data.at(0).at(i) / d1 * grad.at(0).at(0);
+            backward.at(1)->grad.at(0).at(i) -= std::log(backward.at(0)->data.at(0).at(i)) * grad.at(0).at(0);
         }
     }
 
@@ -411,14 +416,14 @@ namespace CG
     void ReLU::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(i) = (backward.at(0)->data.at(i) >= 0) ? backward.at(0)->data.at(i) : 0;
+            data.at(0).at(i) = (backward.at(0)->data.at(0).at(i) >= 0) ? backward.at(0)->data.at(0).at(i) : 0;
         }
     }
 
     void ReLU::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(i) += (backward.at(0)->data.at(i) >= 0) ? 1 * grad.at(i) : 0;
+            backward.at(0)->grad.at(0).at(i) += (backward.at(0)->data.at(0).at(i) >= 0) ? 1 * grad.at(0).at(i) : 0;
         }
     }
 
@@ -429,15 +434,15 @@ namespace CG
     void Sigmoid::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(i)));
-            data.at(i) = 1 / (1 + std::exp(-x));
+            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(0).at(i)));
+            data.at(0).at(i) = 1 / (1 + std::exp(-x));
         }
     }
 
     void Sigmoid::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(i) = data.at(i) * (1 - (data.at(i))) * grad.at(i);
+            data.at(0).at(i) = data.at(0).at(i) * (1 - (data.at(0).at(i))) * grad.at(0).at(i);
         }
     }
 
@@ -448,16 +453,16 @@ namespace CG
     void Tanh::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(i)));
+            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(0).at(i)));
             dtype e2x = std::exp(2 * x);
-            data.at(i) = (e2x - 1) / (e2x + 1);
+            data.at(0).at(i) = (e2x - 1) / (e2x + 1);
         }
     }
 
     void Tanh::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(i) = (1 - (data.at(i)) * (data.at(i))) * grad.at(i);
+            data.at(0).at(i) = (1 - (data.at(0).at(i)) * (data.at(0).at(i))) * grad.at(0).at(i);
         }
     }
 
@@ -467,20 +472,20 @@ namespace CG
 
     void Softmax::calcData()
     {
-        dtype max = backward.at(0)->data.at(0);
+        dtype max = backward.at(0)->data.at(0).at(0);
         for (int i=1; i<domsize; ++i) {
-            max = std::max(max, backward.at(0)->data.at(i));
+            max = std::max(max, backward.at(0)->data.at(0).at(i));
         }
 
         dtype sum = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype z = std::max(backward.at(0)->data.at(i)-max, -10.0);
+            dtype z = std::max(backward.at(0)->data.at(0).at(i)-max, -10.0);
             sum += std::exp(z);
         }
 
         for (int i=0; i<domsize; ++i) {
-            dtype z = std::max(backward.at(0)->data.at(i)-max, -10.0);
-            data.at(i) = std::exp(z) / sum;
+            dtype z = std::max(backward.at(0)->data.at(0).at(i)-max, -10.0);
+            data.at(0).at(i) = std::exp(z) / sum;
         }
     }
 
@@ -489,9 +494,9 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<domsize; ++j) {
                 if (i == j) {
-                    backward.at(0)->grad.at(i) += data.at(j) * (1 - data.at(i)) * grad.at(j);
+                    backward.at(0)->grad.at(0).at(i) += data.at(0).at(j) * (1 - data.at(0).at(i)) * grad.at(0).at(j);
                 } else {
-                    backward.at(0)->grad.at(i) -= data.at(j) *      data.at(i)  * grad.at(j);
+                    backward.at(0)->grad.at(0).at(i) -= data.at(0).at(j) *      data.at(0).at(i)  * grad.at(0).at(j);
                 }
             }
         }
@@ -503,26 +508,26 @@ namespace CG
 
     void Norm2::calcData()
     {
-        data.at(0) = 0;
+        data.at(0).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            data.at(0) += backward.at(0)->data.at(i) * backward.at(0)->data.at(i);
+            data.at(0).at(0) += backward.at(0)->data.at(0).at(i) * backward.at(0)->data.at(0).at(i);
         }
-        data.at(0) = sqrt(data.at(0));
+        data.at(0).at(0) = sqrt(data.at(0).at(0));
     }
             
     void Norm2::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(i) += backward.at(0)->data.at(i) / data.at(0) * grad.at(0);
+            backward.at(0)->grad.at(0).at(i) += backward.at(0)->data.at(0).at(i) / data.at(0).at(0) * grad.at(0).at(0);
         }
     }
 
     
     
     Affine::Affine (Node *node1, vec2<dtype> Weight, dtype bias)
-    : Node (node1->data.size(), Weight.at(0).size(), 1), bias(bias)
+    : Node (node1->dsize, Weight.at(0).size(), 1), bias(bias)
     {
-        assert (node1->data.size() + 1 == Weight.size());
+        assert (node1->dsize + 1 == Weight.size());
         for (int i=1; i<Weight.size(); ++i) {
             assert (Weight.at(i).size() == Weight.at(0).size());
         }
@@ -534,8 +539,6 @@ namespace CG
         for (int i=0; i<=domsize; ++i) {
             gradWeight.at(i).resize(height);
         }
-        data.resize(height);
-        grad.resize(height);
 
         forward.resize(0);
 
@@ -550,37 +553,37 @@ namespace CG
 
     void Affine::calcData()
     {
-        for (int i=0; i<data.size(); ++i) {
-            data.at(i) = 0;
+        for (int i=0; i<dsize; ++i) {
+            data.at(0).at(i) = 0;
             for (int j=0; j<domsize; ++j) {
-                data.at(i) += weight.at(j).at(i) * backward.at(0)->data.at(j);
+                data.at(0).at(i) += weight.at(j).at(i) * backward.at(0)->data.at(0).at(j);
             }
-            data.at(i) += weight.at(domsize).at(i) * bias;
+            data.at(0).at(i) += weight.at(domsize).at(i) * bias;
         }
     }
 
     void Affine::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            for (int j=0; j<data.size(); ++j) {
-                backward.at(0)->grad.at(i) += weight.at(i).at(j) * grad.at(j);
+            for (int j=0; j<dsize; ++j) {
+                backward.at(0)->grad.at(0).at(i) += weight.at(i).at(j) * grad.at(0).at(j);
             }
         }
 
         for (int i=0; i<domsize; ++i) {
-            for (int j=0; j<data.size(); ++j) {
-                gradWeight.at(i).at(j) += backward.at(0)->data.at(i) * grad.at(j);
+            for (int j=0; j<dsize; ++j) {
+                gradWeight.at(i).at(j) += backward.at(0)->data.at(0).at(i) * grad.at(0).at(j);
             }
         }
-        for (int j=0; j<data.size(); ++j) {
-            gradWeight.at(domsize).at(j) += bias * grad.at(j);
+        for (int j=0; j<dsize; ++j) {
+            gradWeight.at(domsize).at(j) += bias * grad.at(0).at(j);
         }
     }
 
     void Affine::updateParameters(dtype eta)
     {
         for (int i=0; i<=domsize; ++i) {
-            for (int j=0; j<data.size(); ++j) {
+            for (int j=0; j<dsize; ++j) {
                 weight.at(i).at(j) -= eta * gradWeight.at(i).at(j);
                 gradWeight.at(i).at(j) = 0;
             }
@@ -639,11 +642,11 @@ namespace CG
         for (int a=0; a<height; ++a) {
             for (int b=0; b<width; ++b) {
                 int index = a * width + b;
-                data.at(index) = bias;
+                data.at(0).at(index) = bias;
                 for (int c=0; c<backward.size(); ++c) {
                     for (int i=0; i<kheight; ++i) {
                         for (int j=0; j<kwidth; ++j) {
-                            data.at(index) += kernel.at(c).at(i).at(j) * getDomData(c, a * sw + i - pt, b * sw + j - pl);
+                            data.at(0).at(index) += kernel.at(c).at(i).at(j) * getDomData(c, a * sw + i - pt, b * sw + j - pl);
                         }
                     }
                 }
@@ -658,13 +661,13 @@ namespace CG
         for (int c=0; c<backward.size(); ++c) {
             for (int a=0; a<bheight; ++a) {
                 for (int b=0; b<bwidth; ++b) {
-                    //backward.at(0)->grad.at(a * bwidth + b) = 0;
+                    //backward.at(0)->grad.at(0).at(a * bwidth + b) = 0;
                     for (int i=(a+pt)%sw; i<kheight; i+=sw) {
                         for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
                             int col = (a - i + pt) / sw;
                             int row = (b - j + pl) / sw;
                             if (0 <= col && col < height && 0 <= row && row < width) {
-                                backward.at(c)->grad.at(a * bwidth + b) += kernel.at(c).at(i).at(j) * grad.at(col * width + row);
+                                backward.at(c)->grad.at(0).at(a * bwidth + b) += kernel.at(c).at(i).at(j) * grad.at(0).at(col * width + row);
                             }
                         }
                     }
@@ -676,7 +679,7 @@ namespace CG
                 for (int j=0; j<kwidth; ++j) {
                     for (int a=0; a<height; ++a) {
                         for (int b=0; b<width; ++b) {
-                            gradKernel.at(c).at(i).at(j) += getDomData(c, a * sw + i - pt, b * sw + j - pl) * grad.at(a * width + b);
+                            gradKernel.at(c).at(i).at(j) += getDomData(c, a * sw + i - pt, b * sw + j - pl) * grad.at(0).at(a * width + b);
                         }
                     }
                 }
@@ -684,7 +687,7 @@ namespace CG
         }
         for (int a=0; a<height; ++a) {
             for (int b=0; b<width; ++b) {
-                gradBias += grad.at(a * width + b);
+                gradBias += grad.at(0).at(a * width + b);
             }
         }
     }
@@ -747,7 +750,7 @@ namespace CG
                     }
                 }
                 assert (!std::isnan(max));
-                data.at(a * width + b) = max;
+                data.at(0).at(a * width + b) = max;
                 maxCount.at(a * width + b) = count;
             }
         }
@@ -759,14 +762,14 @@ namespace CG
         size_t bwidth  = backward.at(0)->width;
         for (int a=0; a<bheight; ++a) {
             for (int b=0; b<bwidth; ++b) {
-                //backward.at(0)->grad.at(a * bwidth + b) = 0;
+                //backward.at(0)->grad.at(0).at(a * bwidth + b) = 0;
                 for (int i=(a+pt)%sw; i<kheight; i+=sw) {
                     for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
                         int col = (a - i + pt) / sw;
                         int row = (b - j + pl) / sw;
                         if (   0 <= col && col < height && 0 <= row && row < width
-                            && (backward.at(0)->data.at(a * bwidth + b) == data.at(col * width + row))) {
-                            backward.at(0)->grad.at(a * bwidth + b) += grad.at(col * width + row) / maxCount.at(col * width + row);
+                            && (backward.at(0)->data.at(0).at(a * bwidth + b) == data.at(0).at(col * width + row))) {
+                            backward.at(0)->grad.at(0).at(a * bwidth + b) += grad.at(0).at(col * width + row) / maxCount.at(col * width + row);
                         }
                     }
                 }
@@ -805,7 +808,7 @@ namespace CG
                         sum += getDomData(col, row);
                     }
                 }
-                data.at(a * width + b) = sum / (kheight * kwidth);
+                data.at(0).at(a * width + b) = sum / (kheight * kwidth);
             }
         }
     }
@@ -816,13 +819,13 @@ namespace CG
         size_t bwidth  = backward.at(0)->width;
         for (int a=0; a<bheight; ++a) {
             for (int b=0; b<bwidth; ++b) {
-                //backward.at(0)->grad.at(a * bwidth + b) = 0;
+                //backward.at(0)->grad.at(0).at(a * bwidth + b) = 0;
                 for (int i=(a+pt)%sw; i<kheight; i+=sw) {
                     for (int j=(b+pl)%sw; j<kwidth; j+=sw) {
                         int col = (a - i + pt) / sw;
                         int row = (b - j + pl) / sw;
                         if (   0 <= col && col < height && 0 <= row && row < width) {
-                            backward.at(0)->grad.at(a * bwidth + b) += grad.at(col * width + row) / (kheight * kwidth);
+                            backward.at(0)->grad.at(0).at(a * bwidth + b) += grad.at(0).at(col * width + row) / (kheight * kwidth);
                         }
                     }
                 }
@@ -836,7 +839,7 @@ namespace CG
     {
         size_t ret = 0;
         for (int i=0; i<nodes.size(); ++i) {
-            ret += nodes.at(i)->data.size();
+            ret += nodes.at(i)->dsize;
         }
         return ret;
     }
@@ -854,13 +857,13 @@ namespace CG
     {
         std::cout << name << " back size = " << node1.backward.size()    << std::endl;
         std::cout << name << " forw size = " << node1.forward.size() << std::endl;
-        std::cout << name << " data size = " << node1.data.size()    << std::endl;
+        std::cout << name << " data size = " << node1.dsize    << std::endl;
         std::cout << name << " data      = ";
-        for (int i=0; i<node1.data.size(); ++i) { std::cout << node1.data.at(i) << ((i==node1.data.size()-1) ? "" : " "); }
+        for (int i=0; i<node1.dsize; ++i) { std::cout << node1.data.at(0).at(i) << ((i==node1.dsize-1) ? "" : " "); }
         std::cout << std::endl;
-        std::cout << name << " grad size = " << node1.grad.size()    << std::endl;
+        std::cout << name << " grad size = " << node1.grad.at(0).size()    << std::endl;
         std::cout << name << " grad      = ";
-        for (int i=0; i<node1.grad.size(); ++i) { std::cout << node1.grad.at(i) << ((i==node1.grad.size()-1) ? "" : " "); }
+        for (int i=0; i<node1.grad.at(0).size(); ++i) { std::cout << node1.grad.at(0).at(i) << ((i==node1.grad.at(0).size()-1) ? "" : " "); }
         std::cout << std::endl;
     }
 };

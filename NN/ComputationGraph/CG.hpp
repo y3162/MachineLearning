@@ -12,27 +12,32 @@ namespace CG
     template<typename T> using vec2 = type::vec2<T>;
     template<typename T> using vec3 = type::vec3<T>;
     using dtype = type::dtype;
+    using ttype = type::ttype;
     class Node
     {
         public :
             const size_t domsize;
             const size_t height;
             const size_t width;
-            vec1<dtype>  data;
-            vec1<dtype>  grad;
+            const size_t dsize;
+            vec2<dtype>  data;
+            vec2<dtype>  grad;
             vec1<Node*>  forward;
             vec1<Node*>  backward;
-            int          f_count = 0;
-            int          b_count = 0;
+            ttype        time = 0;
+            vec1<int>    f_count;
+            vec1<int>    b_count;
 
             Node (size_t domsize, size_t height, size_t width);
 
             void pushThis(Node *node);
 
             virtual void calcData();
+            void forwardPropagation(ttype time);
             void forwardPropagation();
 
             virtual void calcPartialDerivative();
+            void backwardPropagation(ttype time);
             void backwardPropagation();
 
             virtual void updateParameters(dtype eta);
