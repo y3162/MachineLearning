@@ -41,6 +41,7 @@ namespace CG
             void backwardPropagation();
 
             virtual void updateParameters(dtype eta);
+            void update(dtype eta, ttype time);
             void update(dtype eta);
     };
 
@@ -49,6 +50,7 @@ namespace CG
         public :
             Leaf1 (size_t size);
 
+            void getInput(vec1<dtype> input, ttype time);
             void getInput(vec1<dtype> input);
     };
 
@@ -57,7 +59,9 @@ namespace CG
         public :
             Leaf2 (size_t height, size_t width);
 
+            void getInput(vec1<dtype> input, ttype time);
             void getInput(vec1<dtype> input);
+            void getInput(vec2<dtype> input, ttype time);
             void getInput(vec2<dtype> input);
     };
 
@@ -283,7 +287,8 @@ namespace CG
     size_t getSumSizeOfData(vec1<Node*> nodes);
     size_t getSumSizeOfHeight(vec1<Node*> nodes);
 
-    void dumpNode (Node const node1, std::string name);
+    void dumpNode(Node const node1, std::string name, ttype time); 
+    void dumpNode(Node const node1, std::string name);
 };
 
 #endif

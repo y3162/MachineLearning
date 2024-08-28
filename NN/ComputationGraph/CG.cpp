@@ -9,12 +9,14 @@ namespace CG
     Node::Node (size_t domsize, size_t height, size_t width)
     : domsize(domsize), height(height), width(width), dsize(height * width)
     {
+        forward.resize(0);
+
         data.resize(1);
         data.at(0).resize(dsize);
         grad.resize(1);
         grad.at(0).resize(dsize);
-        f_count.resize(1, 0);
-        b_count.resize(1, 0);
+        f_count.resize(1);
+        b_count.resize(1);
     }
 
     void Node::pushThis(Node *node) // push this as argument's forward node
@@ -26,33 +28,36 @@ namespace CG
     void Node::calcData(){}
     void Node::forwardPropagation(ttype time)
     {
+        size_t T = data.size();
+        assert (T == grad.size());
+        if (T <= time) {
+            data.resize(time + 1);
+            grad.resize(time + 1);
+            for (int t=T; t<=time; ++t) {
+                data.at(t).resize(dsize);
+                grad.at(t).resize(dsize);
+            }
+            f_count.resize(time + 1);
+            b_count.resize(time + 1);
+        }
+
         if (++b_count.at(time) < backward.size()) {
             return;
         } else { // When all the forward passes from the units in the preceding layer have been completed
             b_count.at(time) = 0;
         }
-
-        assert (data.size() == grad.size());
-        if (data.size() == time) {
-            data.resize(time + 1);
-            data.at(time).resize(dsize);
-            grad.resize(time + 1);
-            grad.at(time).resize(dsize);
-            f_count.resize(time + 1);
-            b_count.resize(time + 1);
-        } else {
-            assert (data.size() > time);
-        }
         
-        for (int i=0; i<dsize; ++i) {
-            grad.at(time).at(i) = 0;
+        for (int t=0; t<data.size(); ++t) {
+            for (int i=0; i<dsize; ++i) {
+                grad.at(t).at(i) = 0;
+            }
         }
 
         this->time = time;
         calcData();
 
         for (int i=0; i<forward.size(); ++i) {
-            forward.at(i)->forwardPropagation();
+            forward.at(i)->forwardPropagation(time);
         }
     }
     void Node::forwardPropagation()
@@ -71,12 +76,14 @@ namespace CG
 
         if (forward.size() == 0) {
             assert (dsize == 1);
-            grad.at(0).at(0) = 1;
+            grad.at(time).at(0) = 1;
         }
+
+        this->time = time;
         calcPartialDerivative();
 
         for (int i=0; i<backward.size(); ++i) {
-            backward.at(i)->backwardPropagation();
+            backward.at(i)->backwardPropagation(time);
         }
     }
     void Node::backwardPropagation()
@@ -85,7 +92,7 @@ namespace CG
     }
 
     void Node::updateParameters(dtype eta){}
-    void Node::update(dtype eta)
+    void Node::update(dtype eta, ttype time)
     {
         if (++f_count.at(time) < forward.size()) {
             return;
@@ -93,11 +100,16 @@ namespace CG
             f_count.at(time) = 0;
         }
 
+        this->time = time;
         updateParameters(eta);
 
         for (int i=0; i<backward.size(); ++i) {
-            backward.at(i)->update(eta);
+            backward.at(i)->update(eta, time);
         }
+    }
+    void Node::update(dtype eta)
+    {
+        update(eta, 0);
     }
 
 
@@ -105,41 +117,92 @@ namespace CG
     Leaf1::Leaf1 (size_t size)
     : Node (0, size, 1)
     {
-        forward.resize(0);
         backward.resize(0);
     }
 
-    void Leaf1::getInput(vec1<dtype> input)
+    void Leaf1::getInput(vec1<dtype> input, ttype time)
     {
         assert (dsize == input.size());
-        data.at(0) = input;
+        size_t T = data.size();
+        if (time >= T) {
+            data.resize(time + 1);
+            grad.resize(time + 1);
+            for (int t=T; t<=time; ++t) {
+                data.at(t).resize(dsize);
+                grad.at(t).resize(dsize);
+            }
+            f_count.resize(time + 1);
+            b_count.resize(time + 1);
+        }
+
+        //data.at(time) = input;
+        for (int i=0; i<dsize; ++i) {
+            data.at(time).at(i) = input.at(i);
+        }
+    }
+    void Leaf1::getInput(vec1<dtype> input)
+    {
+        getInput(input, 0);
     }
 
 
 
     Leaf2::Leaf2 (size_t height, size_t width)
     : Node (0, height, width)
-    {   
-        forward.resize(0);
+    {
         backward.resize(0);
     }
 
-    void Leaf2::getInput(vec1<dtype> input)
+    void Leaf2::getInput(vec1<dtype> input, ttype time)
     {
         assert (dsize == input.size());
-        data.at(0) = input;
+        int T = data.size();
+        if (time >= T) {
+            data.resize(time + 1);
+            grad.resize(time + 1);
+            for (int t=T-1; t<=time; ++t) {
+                data.at(t).resize(dsize);
+                grad.at(t).resize(dsize);
+            }
+            f_count.resize(time + 1);
+            b_count.resize(time + 1);
+        }
+
+        //data.at(time) = input;
+        for (int i=0; i<dsize; ++i) {
+            data.at(time).at(i) = input.at(i);
+        }
+    }
+    void Leaf2::getInput(vec1<dtype> input)
+    {
+        getInput(input, 0);
     }
 
-    void Leaf2::getInput(vec2<dtype> input)
+    void Leaf2::getInput(vec2<dtype> input, ttype time)
     {
-        assert (input.size() == height);
+        assert (height == input.size());
+        int T = data.size();
+        if (time >= T) {
+            data.resize(time + 1);
+            grad.resize(time + 1);
+            for (int t=T-1; t<=time; ++t) {
+                data.at(t).resize(dsize);
+                grad.at(t).resize(dsize);
+            }
+            f_count.resize(time + 1);
+            b_count.resize(time + 1);
+        }
 
         for (int i=0; i<height; ++i) {
             assert (input.at(i).size() == width);
             for (int j=0; j<width; ++j) {
-                data.at(0).at(i * width + j) = input.at(i).at(j);
+                data.at(time).at(i * width + j) = input.at(i).at(j);
             }
         }
+    }
+    void Leaf2::getInput(vec2<dtype> input)
+    {
+        getInput(input, 0);
     }
 
 
@@ -155,8 +218,6 @@ namespace CG
                 dataSize.at(i) = dataSize.at(i-1) + nodes.at(i-1)->dsize;
             }
         }
-
-        forward.resize(0);
 
         backward.resize(nodes.size());
         for (int i=0; i<nodes.size(); ++i) {
@@ -181,7 +242,7 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             int index = whichNode(i);
             size_t remain = i - dataSize.at(index);
-            data.at(0).at(i) = backward.at(index)->data.at(0).at(remain);
+            data.at(time).at(i) = backward.at(index)->data.at(time).at(remain);
         }
     }
 
@@ -190,7 +251,7 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             int index = whichNode(i);
             size_t remain = i - dataSize.at(index);
-            backward.at(index)->grad.at(0).at(remain) = grad.at(0).at(i);
+            backward.at(index)->grad.at(time).at(remain) = grad.at(time).at(i);
         }
     }
 
@@ -202,8 +263,6 @@ namespace CG
         assert (node1->dsize == node2->dsize);
         assert (node1->height == node2->height);
         assert (node1->width  == node2->width);
-
-        forward.resize(0);
 
         backward.resize(2);
         backward.at(0) = node1;
@@ -222,8 +281,6 @@ namespace CG
         assert (node1->height == node2->height);
         assert (node1->width  == node2->width);
 
-        forward.resize(0);
-
         backward.resize(2);
         backward.at(0) = node1;
         backward.at(1) = node2;
@@ -237,8 +294,6 @@ namespace CG
     MtoM::MtoM (Node *node1)
     : Node (node1->dsize, node1->height, node1->width)
     {
-        forward.resize(0);
-
         backward.resize(1);
         backward.at(0) = node1;
 
@@ -250,8 +305,6 @@ namespace CG
     Mto1::Mto1 (Node *node1)
     : Node (node1->dsize, 1, 1)
     {
-        forward.resize(0);
-
         backward.resize(1);
         backward.at(0) = node1;
 
@@ -270,8 +323,6 @@ namespace CG
             assert (kernelWidth  <= nodes.at(c)->width);
             assert (nodes.at(c)->height * nodes.at(c)->width == nodes.at(c)->dsize);
         }
-
-        forward.resize(0);
 
         backward.resize(channel);
         for (int c=0; c<channel; ++c) {
@@ -293,9 +344,9 @@ namespace CG
 
     dtype Filter2d::getDomData(int index, int col, int row)
     {
-        size_t bwidth  = backward.at(0)->width;
+        size_t bwidth  = backward.at(index)->width;
         if (inDomain(col, row)) {
-            return backward.at(index)->data.at(0).at(col * bwidth + row);
+            return backward.at(index)->data.at(time).at(col * bwidth + row);
         } else {
             return 0;
         }
@@ -313,15 +364,15 @@ namespace CG
     void Add::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(i) = backward.at(0)->data.at(0).at(i) + backward.at(1)->data.at(0).at(i);
+            data.at(time).at(i) = backward.at(0)->data.at(time).at(i) + backward.at(1)->data.at(time).at(i);
         }
     }
 
     void Add::calcPartialDerivative()
     {   
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(0).at(i) += 1 * grad.at(0).at(i);
-            backward.at(1)->grad.at(0).at(i) += 1 * grad.at(0).at(i);
+            backward.at(0)->grad.at(time).at(i) += 1 * grad.at(time).at(i);
+            backward.at(1)->grad.at(time).at(i) += 1 * grad.at(time).at(i);
         }
     }
 
@@ -332,15 +383,15 @@ namespace CG
     void Sub::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(i) = backward.at(0)->data.at(0).at(i) - backward.at(1)->data.at(0).at(i);
+            data.at(time).at(i) = backward.at(0)->data.at(time).at(i) - backward.at(1)->data.at(time).at(i);
         }
     }
 
     void Sub::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(0).at(i) +=  1 * grad.at(0).at(i);
-            backward.at(1)->grad.at(0).at(i) += -1 * grad.at(0).at(i);
+            backward.at(0)->grad.at(time).at(i) +=  1 * grad.at(time).at(i);
+            backward.at(1)->grad.at(time).at(i) += -1 * grad.at(time).at(i);
         }
     }
 
@@ -350,17 +401,17 @@ namespace CG
 
     void Dots::calcData()
     {   
-        data.at(0).at(0) = 0;
+        data.at(time).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(0) += backward.at(0)->data.at(0).at(i) * backward.at(1)->data.at(0).at(i);
+            data.at(time).at(0) += backward.at(0)->data.at(time).at(i) * backward.at(1)->data.at(time).at(i);
         }
     }
 
     void Dots::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(0).at(i) += backward.at(1)->data.at(0).at(i) * grad.at(0).at(0);
-            backward.at(1)->grad.at(0).at(i) += backward.at(0)->data.at(0).at(i) * grad.at(0).at(0);
+            backward.at(0)->grad.at(time).at(i) += backward.at(1)->data.at(time).at(i) * grad.at(time).at(0);
+            backward.at(1)->grad.at(time).at(i) += backward.at(0)->data.at(time).at(i) * grad.at(time).at(0);
         }
     }
 
@@ -372,8 +423,8 @@ namespace CG
     {   
         data.at(0).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype err = backward.at(0)->data.at(0).at(i) - backward.at(1)->data.at(0).at(i);
-            data.at(0).at(0) += err * err;
+            dtype err = backward.at(0)->data.at(time).at(i) - backward.at(1)->data.at(time).at(i);
+            data.at(time).at(0) += err * err;
         }
         data.at(0).at(0) /= domsize;
     }
@@ -381,9 +432,9 @@ namespace CG
     void MSE::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype err = backward.at(0)->data.at(0).at(i) - backward.at(1)->data.at(0).at(i);
-            backward.at(0)->grad.at(0).at(i) +=   2 * err * grad.at(0).at(0) / domsize;
-            backward.at(1)->grad.at(0).at(i) += - 2 * err * grad.at(0).at(0) / domsize;
+            dtype err = backward.at(0)->data.at(time).at(i) - backward.at(1)->data.at(time).at(i);
+            backward.at(0)->grad.at(time).at(i) +=   2 * err * grad.at(time).at(0) / domsize;
+            backward.at(1)->grad.at(time).at(i) += - 2 * err * grad.at(time).at(0) / domsize;
         }
     }
 
@@ -393,19 +444,19 @@ namespace CG
 
     void CEE::calcData()
     {
-        data.at(0).at(0) = 0;
+        data.at(time).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype d1 = std::max(backward.at(0)->data.at(0).at(i), 1e-10);
-            data.at(0).at(0) -= backward.at(1)->data.at(0).at(i) * std::log(d1);
+            dtype d1 = std::max(backward.at(0)->data.at(time).at(i), 1e-10);
+            data.at(time).at(0) -= backward.at(1)->data.at(time).at(i) * std::log(d1);
         }
     }
 
     void CEE::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype d1 = std::max(backward.at(0)->data.at(0).at(i), 1e-10);
-            backward.at(0)->grad.at(0).at(i) -= backward.at(1)->data.at(0).at(i) / d1 * grad.at(0).at(0);
-            backward.at(1)->grad.at(0).at(i) -= std::log(backward.at(0)->data.at(0).at(i)) * grad.at(0).at(0);
+            dtype d1 = std::max(backward.at(0)->data.at(time).at(i), 1e-10);
+            backward.at(0)->grad.at(time).at(i) -= backward.at(1)->data.at(time).at(i) / d1 * grad.at(time).at(0);
+            backward.at(1)->grad.at(time).at(i) -= std::log(backward.at(0)->data.at(time).at(i)) * grad.at(time).at(0);
         }
     }
 
@@ -416,14 +467,14 @@ namespace CG
     void ReLU::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(i) = (backward.at(0)->data.at(0).at(i) >= 0) ? backward.at(0)->data.at(0).at(i) : 0;
+            data.at(time).at(i) = (backward.at(0)->data.at(time).at(i) >= 0) ? backward.at(0)->data.at(time).at(i) : 0;
         }
     }
 
     void ReLU::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(0).at(i) += (backward.at(0)->data.at(0).at(i) >= 0) ? 1 * grad.at(0).at(i) : 0;
+            backward.at(0)->grad.at(time).at(i) += (backward.at(0)->data.at(time).at(i) >= 0) ? 1 * grad.at(time).at(i) : 0;
         }
     }
 
@@ -434,18 +485,17 @@ namespace CG
     void Sigmoid::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(0).at(i)));
-            data.at(0).at(i) = 1 / (1 + std::exp(-x));
+            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(time).at(i)));
+            data.at(time).at(i) = 1 / (1 + std::exp(-x));
         }
     }
 
     void Sigmoid::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(i) = data.at(0).at(i) * (1 - (data.at(0).at(i))) * grad.at(0).at(i);
+            data.at(time).at(i) = data.at(time).at(i) * (1 - (data.at(time).at(i))) * grad.at(time).at(i);
         }
     }
-
 
 
     Tanh::Tanh (Node *node1) : MtoM (node1){};
@@ -453,16 +503,16 @@ namespace CG
     void Tanh::calcData()
     {
         for (int i=0; i<domsize; ++i) {
-            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(0).at(i)));
+            dtype x = std::min(10.0, std::max(-10.0, backward.at(0)->data.at(time).at(i)));
             dtype e2x = std::exp(2 * x);
-            data.at(0).at(i) = (e2x - 1) / (e2x + 1);
+            data.at(time).at(i) = (e2x - 1) / (e2x + 1);
         }
     }
 
     void Tanh::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(i) = (1 - (data.at(0).at(i)) * (data.at(0).at(i))) * grad.at(0).at(i);
+            data.at(time).at(i) = (1 - (data.at(time).at(i)) * (data.at(time).at(i))) * grad.at(time).at(i);
         }
     }
 
@@ -472,20 +522,20 @@ namespace CG
 
     void Softmax::calcData()
     {
-        dtype max = backward.at(0)->data.at(0).at(0);
+        dtype max = backward.at(0)->data.at(time).at(0);
         for (int i=1; i<domsize; ++i) {
-            max = std::max(max, backward.at(0)->data.at(0).at(i));
+            max = std::max(max, backward.at(0)->data.at(time).at(i));
         }
 
         dtype sum = 0;
         for (int i=0; i<domsize; ++i) {
-            dtype z = std::max(backward.at(0)->data.at(0).at(i)-max, -10.0);
+            dtype z = std::max(backward.at(0)->data.at(time).at(i)-max, -10.0);
             sum += std::exp(z);
         }
 
         for (int i=0; i<domsize; ++i) {
-            dtype z = std::max(backward.at(0)->data.at(0).at(i)-max, -10.0);
-            data.at(0).at(i) = std::exp(z) / sum;
+            dtype z = std::max(backward.at(0)->data.at(time).at(i)-max, -10.0);
+            data.at(time).at(i) = std::exp(z) / sum;
         }
     }
 
@@ -494,9 +544,9 @@ namespace CG
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<domsize; ++j) {
                 if (i == j) {
-                    backward.at(0)->grad.at(0).at(i) += data.at(0).at(j) * (1 - data.at(0).at(i)) * grad.at(0).at(j);
+                    backward.at(0)->grad.at(time).at(i) += data.at(time).at(j) * (1 - data.at(time).at(i)) * grad.at(time).at(j);
                 } else {
-                    backward.at(0)->grad.at(0).at(i) -= data.at(0).at(j) *      data.at(0).at(i)  * grad.at(0).at(j);
+                    backward.at(0)->grad.at(time).at(i) -= data.at(time).at(j) *      data.at(time).at(i)  * grad.at(time).at(j);
                 }
             }
         }
@@ -508,17 +558,17 @@ namespace CG
 
     void Norm2::calcData()
     {
-        data.at(0).at(0) = 0;
+        data.at(time).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
-            data.at(0).at(0) += backward.at(0)->data.at(0).at(i) * backward.at(0)->data.at(0).at(i);
+            data.at(time).at(0) += backward.at(0)->data.at(time).at(i) * backward.at(0)->data.at(time).at(i);
         }
-        data.at(0).at(0) = sqrt(data.at(0).at(0));
+        data.at(time).at(0) = sqrt(data.at(time).at(0));
     }
             
     void Norm2::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            backward.at(0)->grad.at(0).at(i) += backward.at(0)->data.at(0).at(i) / data.at(0).at(0) * grad.at(0).at(0);
+            backward.at(0)->grad.at(time).at(i) += backward.at(0)->data.at(time).at(i) / data.at(time).at(0) * grad.at(time).at(0);
         }
     }
 
@@ -540,8 +590,6 @@ namespace CG
             gradWeight.at(i).resize(height);
         }
 
-        forward.resize(0);
-
         backward.resize(1);
         backward.at(0) = node1;
 
@@ -554,11 +602,11 @@ namespace CG
     void Affine::calcData()
     {
         for (int i=0; i<dsize; ++i) {
-            data.at(0).at(i) = 0;
+            data.at(time).at(i) = 0;
             for (int j=0; j<domsize; ++j) {
-                data.at(0).at(i) += weight.at(j).at(i) * backward.at(0)->data.at(0).at(j);
+                data.at(time).at(i) += weight.at(j).at(i) * backward.at(0)->data.at(time).at(j);
             }
-            data.at(0).at(i) += weight.at(domsize).at(i) * bias;
+            data.at(time).at(i) += weight.at(domsize).at(i) * bias;
         }
     }
 
@@ -566,17 +614,17 @@ namespace CG
     {
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<dsize; ++j) {
-                backward.at(0)->grad.at(0).at(i) += weight.at(i).at(j) * grad.at(0).at(j);
+                backward.at(0)->grad.at(time).at(i) += weight.at(i).at(j) * grad.at(time).at(j);
             }
         }
 
         for (int i=0; i<domsize; ++i) {
             for (int j=0; j<dsize; ++j) {
-                gradWeight.at(i).at(j) += backward.at(0)->data.at(0).at(i) * grad.at(0).at(j);
+                gradWeight.at(i).at(j) += backward.at(0)->data.at(time).at(i) * grad.at(time).at(j);
             }
         }
         for (int j=0; j<dsize; ++j) {
-            gradWeight.at(domsize).at(j) += bias * grad.at(0).at(j);
+            gradWeight.at(domsize).at(j) += bias * grad.at(time).at(j);
         }
     }
 
@@ -605,7 +653,7 @@ namespace CG
 
         kernel = Kernel;
 
-        bias   = bias;
+        this->bias = bias;
         gradKernel.resize(backward.size());
         for (int c=0; c<backward.size(); ++c) {
             gradKernel.at(c).resize(kheight);
@@ -642,11 +690,11 @@ namespace CG
         for (int a=0; a<height; ++a) {
             for (int b=0; b<width; ++b) {
                 int index = a * width + b;
-                data.at(0).at(index) = bias;
+                data.at(time).at(index) = bias;
                 for (int c=0; c<backward.size(); ++c) {
                     for (int i=0; i<kheight; ++i) {
                         for (int j=0; j<kwidth; ++j) {
-                            data.at(0).at(index) += kernel.at(c).at(i).at(j) * getDomData(c, a * sw + i - pt, b * sw + j - pl);
+                            data.at(time).at(index) += kernel.at(c).at(i).at(j) * getDomData(c, a * sw + i - pt, b * sw + j - pl);
                         }
                     }
                 }
@@ -667,7 +715,7 @@ namespace CG
                             int col = (a - i + pt) / sw;
                             int row = (b - j + pl) / sw;
                             if (0 <= col && col < height && 0 <= row && row < width) {
-                                backward.at(c)->grad.at(0).at(a * bwidth + b) += kernel.at(c).at(i).at(j) * grad.at(0).at(col * width + row);
+                                backward.at(c)->grad.at(time).at(a * bwidth + b) += kernel.at(c).at(i).at(j) * grad.at(time).at(col * width + row);
                             }
                         }
                     }
@@ -679,7 +727,7 @@ namespace CG
                 for (int j=0; j<kwidth; ++j) {
                     for (int a=0; a<height; ++a) {
                         for (int b=0; b<width; ++b) {
-                            gradKernel.at(c).at(i).at(j) += getDomData(c, a * sw + i - pt, b * sw + j - pl) * grad.at(0).at(a * width + b);
+                            gradKernel.at(c).at(i).at(j) += getDomData(c, a * sw + i - pt, b * sw + j - pl) * grad.at(time).at(a * width + b);
                         }
                     }
                 }
@@ -687,7 +735,7 @@ namespace CG
         }
         for (int a=0; a<height; ++a) {
             for (int b=0; b<width; ++b) {
-                gradBias += grad.at(0).at(a * width + b);
+                gradBias += grad.at(time).at(a * width + b);
             }
         }
     }
@@ -750,7 +798,7 @@ namespace CG
                     }
                 }
                 assert (!std::isnan(max));
-                data.at(0).at(a * width + b) = max;
+                data.at(time).at(a * width + b) = max;
                 maxCount.at(a * width + b) = count;
             }
         }
@@ -768,8 +816,8 @@ namespace CG
                         int col = (a - i + pt) / sw;
                         int row = (b - j + pl) / sw;
                         if (   0 <= col && col < height && 0 <= row && row < width
-                            && (backward.at(0)->data.at(0).at(a * bwidth + b) == data.at(0).at(col * width + row))) {
-                            backward.at(0)->grad.at(0).at(a * bwidth + b) += grad.at(0).at(col * width + row) / maxCount.at(col * width + row);
+                            && (backward.at(0)->data.at(time).at(a * bwidth + b) == data.at(time).at(col * width + row))) {
+                            backward.at(0)->grad.at(time).at(a * bwidth + b) += grad.at(time).at(col * width + row) / maxCount.at(col * width + row);
                         }
                     }
                 }
@@ -808,7 +856,7 @@ namespace CG
                         sum += getDomData(col, row);
                     }
                 }
-                data.at(0).at(a * width + b) = sum / (kheight * kwidth);
+                data.at(time).at(a * width + b) = sum / (kheight * kwidth);
             }
         }
     }
@@ -825,7 +873,7 @@ namespace CG
                         int col = (a - i + pt) / sw;
                         int row = (b - j + pl) / sw;
                         if (   0 <= col && col < height && 0 <= row && row < width) {
-                            backward.at(0)->grad.at(0).at(a * bwidth + b) += grad.at(0).at(col * width + row) / (kheight * kwidth);
+                            backward.at(0)->grad.at(time).at(a * bwidth + b) += grad.at(time).at(col * width + row) / (kheight * kwidth);
                         }
                     }
                 }
@@ -853,17 +901,21 @@ namespace CG
         return ret;
     }
 
-    void dumpNode (Node const node1, std::string name)
+    void dumpNode(Node const node1, std::string name, ttype time)
     {
-        std::cout << name << " back size = " << node1.backward.size()    << std::endl;
+        std::cout << name << " back size = " << node1.backward.size() << std::endl;
         std::cout << name << " forw size = " << node1.forward.size() << std::endl;
-        std::cout << name << " data size = " << node1.dsize    << std::endl;
+        std::cout << name << " data size = " << node1.dsize << std::endl;
         std::cout << name << " data      = ";
-        for (int i=0; i<node1.dsize; ++i) { std::cout << node1.data.at(0).at(i) << ((i==node1.dsize-1) ? "" : " "); }
+        for (int i=0; i<node1.dsize; ++i) { std::cout << node1.data.at(time).at(i) << ((i==node1.dsize-1) ? "" : " "); }
         std::cout << std::endl;
-        std::cout << name << " grad size = " << node1.grad.at(0).size()    << std::endl;
+        std::cout << name << " grad size = " << node1.dsize << std::endl;
         std::cout << name << " grad      = ";
-        for (int i=0; i<node1.grad.at(0).size(); ++i) { std::cout << node1.grad.at(0).at(i) << ((i==node1.grad.at(0).size()-1) ? "" : " "); }
+        for (int i=0; i<node1.dsize; ++i) { std::cout << node1.grad.at(time).at(i) << ((i==node1.dsize-1) ? "" : " "); }
         std::cout << std::endl;
+    }
+    void dumpNode(Node const node1, std::string name)
+    {
+        dumpNode(node1, name, 0);
     }
 };
