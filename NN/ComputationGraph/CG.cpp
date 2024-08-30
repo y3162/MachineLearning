@@ -421,12 +421,12 @@ namespace CG
 
     void MSE::calcData()
     {   
-        data.at(0).at(0) = 0;
+        data.at(time).at(0) = 0;
         for (int i=0; i<domsize; ++i) {
             dtype err = backward.at(0)->data.at(time).at(i) - backward.at(1)->data.at(time).at(i);
             data.at(time).at(0) += err * err;
         }
-        data.at(0).at(0) /= domsize;
+        data.at(time).at(0) /= domsize;
     }
 
     void MSE::calcPartialDerivative()
@@ -493,7 +493,7 @@ namespace CG
     void Sigmoid::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(time).at(i) = data.at(time).at(i) * (1 - (data.at(time).at(i))) * grad.at(time).at(i);
+            backward.at(0)->grad.at(time).at(i) = data.at(time).at(i) * (1 - (data.at(time).at(i))) * grad.at(time).at(i);
         }
     }
 
@@ -512,7 +512,7 @@ namespace CG
     void Tanh::calcPartialDerivative()
     {
         for (int i=0; i<domsize; ++i) {
-            data.at(time).at(i) = (1 - (data.at(time).at(i)) * (data.at(time).at(i))) * grad.at(time).at(i);
+            backward.at(0)->grad.at(time).at(i) = (1 - (data.at(time).at(i)) * (data.at(time).at(i))) * grad.at(time).at(i);
         }
     }
 
@@ -654,6 +654,8 @@ namespace CG
         kernel = Kernel;
 
         this->bias = bias;
+        gradBias = 0;
+
         gradKernel.resize(backward.size());
         for (int c=0; c<backward.size(); ++c) {
             gradKernel.at(c).resize(kheight);
@@ -730,6 +732,7 @@ namespace CG
                             gradKernel.at(c).at(i).at(j) += getDomData(c, a * sw + i - pt, b * sw + j - pl) * grad.at(time).at(a * width + b);
                         }
                     }
+                    //std::cout << "grad : " << gradKernel.at(c).at(i).at(j) << std::endl;
                 }
             }
         }
@@ -738,6 +741,7 @@ namespace CG
                 gradBias += grad.at(time).at(a * width + b);
             }
         }
+        //std::cout << "bias : " << gradBias << std::endl;
     }
 
     void Convolution2d::updateParameters(dtype eta)
