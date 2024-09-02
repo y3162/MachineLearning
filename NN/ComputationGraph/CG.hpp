@@ -33,16 +33,16 @@ namespace CG
             void pushThis(Node *node);
 
             virtual void calcData();
-            void forwardPropagation(ttype time);
-            void forwardPropagation();
+            virtual void forwardPropagation(ttype time);
+            virtual void forwardPropagation();
 
             virtual void calcPartialDerivative();
-            void backwardPropagation(ttype time);
-            void backwardPropagation();
+            virtual void backwardPropagation(ttype time);
+            virtual void backwardPropagation();
 
             virtual void updateParameters(dtype eta);
-            void update(dtype eta, ttype time);
-            void update(dtype eta);
+            virtual void update(dtype eta, ttype time);
+            virtual void update(dtype eta);
     };
 
     class Leaf1 : public Node
